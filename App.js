@@ -326,6 +326,15 @@ function HistoryScreen({ navigation }) {
   const [chartData, setChartData] = useState(null);
   const [categoryStats, setCategoryStats] = useState([]);
 
+  const categoryIcons = {
+    'General Knowledge': '🎯',
+    'Science & Nature': '🔬',
+    'History': '📚',
+    'Sports': '⚽',
+    'Film': '🎬',
+    'Geography': '🌍'
+  };
+
   useEffect(() => {
     loadHistory();
     
@@ -519,7 +528,7 @@ function HistoryScreen({ navigation }) {
                   </Text>
                 </View>
                 <Text style={{ fontSize: 30 }}>
-                  {item.percentage >= 70 ? '🎉' : item.percentage >= 50 ? '👍' : '📚'}
+                  {categoryIcons[item.category] || '📝'}
                 </Text>
               </View>
             </View>
