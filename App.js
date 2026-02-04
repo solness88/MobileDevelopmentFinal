@@ -2,7 +2,8 @@ import React, { createContext, useEffect, useState, useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
 import { styles } from './styles';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -313,7 +314,7 @@ function QuizScreen({ navigation, route }) {
 }
 
 // --- 3. History Screen (履歴) ---
-function HistoryScreen() {
+function HistoryScreen({ navigation }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -322,17 +323,18 @@ function HistoryScreen() {
     totalCorrect: 0,
     averageScore: 0
   });
+  const [chartData, setChartData] = useState(null);
+  const [categoryStats, setCategoryStats] = useState([]);
 
   useEffect(() => {
     loadHistory();
     
-    // 画面がフォーカスされたときに履歴を再読み込み
     const unsubscribe = navigation.addListener('focus', () => {
       loadHistory();
     });
 
     return unsubscribe;
-  }, []);
+  }, [navigation]);
 
   const loadHistory = async () => {
     setLoading(true);
@@ -341,7 +343,6 @@ function HistoryScreen() {
       const historyData = savedHistory ? JSON.parse(savedHistory) : [];
       setHistory(historyData);
 
-      // 統計を計算
       if (historyData.length > 0) {
         const totalQuizzes = historyData.length;
         const totalQuestions = historyData.reduce((sum, item) => sum + item.total, 0);
@@ -354,6 +355,41 @@ function HistoryScreen() {
           totalCorrect,
           averageScore
         });
+
+        // 正答率の推移データ（最新10件）
+        const recentQuizzes = historyData.slice(0, 10).reverse();
+        const labels = recentQuizzes.map((_, index) => `${index + 1}`);
+        const data = recentQuizzes.map(item => item.percentage);
+
+        setChartData({
+          labels: labels,
+          datasets: [
+            {
+              data: data,
+              color: (opacity = 1) => `rgba(78, 205, 196, ${opacity})`,
+              strokeWidth: 2
+            }
+          ]
+        });
+
+        // カテゴリー別統計
+        const categoryMap = {};
+        historyData.forEach(item => {
+          if (!categoryMap[item.category]) {
+            categoryMap[item.category] = { total: 0, correct: 0, count: 0 };
+          }
+          categoryMap[item.category].total += item.total;
+          categoryMap[item.category].correct += item.score;
+          categoryMap[item.category].count += 1;
+        });
+
+        const categoryStatsArray = Object.keys(categoryMap).map(category => ({
+          category: category,
+          percentage: Math.round((categoryMap[category].correct / categoryMap[category].total) * 100),
+          count: categoryMap[category].count
+        }));
+
+        setCategoryStats(categoryStatsArray);
       }
     } catch (error) {
       console.error('Error loading history:', error);
@@ -372,6 +408,8 @@ function HistoryScreen() {
         totalCorrect: 0,
         averageScore: 0
       });
+      setChartData(null);
+      setCategoryStats([]);
     } catch (error) {
       console.error('Error clearing history:', error);
     }
@@ -422,10 +460,6 @@ function HistoryScreen() {
           <View style={{ margin: 15, padding: 15, backgroundColor: '#f0f0f0', borderRadius: 8 }}>
             <Text style={[styles.boldTitle, { marginBottom: 10 }]}>Your Stats</Text>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-              <Text style={styles.meta}>Total Quizzes:</Text>
-              <Text style={styles.boldTitle}>{stats.totalQuizzes}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
               <Text style={styles.meta}>Questions Answered:</Text>
               <Text style={styles.boldTitle}>{stats.totalQuestions}</Text>
             </View>
@@ -440,6 +474,34 @@ function HistoryScreen() {
               </Text>
             </View>
           </View>
+
+          {/* カテゴリー別成績 */}
+          {categoryStats.length > 0 && (
+            <View style={{ margin: 15 }}>
+              <Text style={[styles.boldTitle, { marginBottom: 10 }]}>Performance by Category</Text>
+              {categoryStats.map((item, index) => (
+                <View key={index} style={{ marginBottom: 10 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <Text style={styles.meta}>{item.category}</Text>
+                    <Text style={styles.boldTitle}>{item.percentage}%</Text>
+                  </View>
+                  <View style={{ height: 8, backgroundColor: '#e0e0e0', borderRadius: 4 }}>
+                    <View 
+                      style={{ 
+                        height: 8, 
+                        width: `${item.percentage}%`, 
+                        backgroundColor: item.percentage >= 70 ? '#4ECDC4' : item.percentage >= 50 ? '#FFA07A' : '#FF6B6B',
+                        borderRadius: 4 
+                      }} 
+                    />
+                  </View>
+                  <Text style={[styles.meta, { fontSize: 10, marginTop: 2 }]}>
+                    {item.count} quiz{item.count !== 1 ? 'zes' : ''} completed
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <Text style={styles.sectionLabel}>Recent Quizzes</Text>
 
