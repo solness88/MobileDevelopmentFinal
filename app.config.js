@@ -1,5 +1,3 @@
-import 'dotenv/config';
-
 export default {
   expo: {
     name: "news-reader-app",
@@ -26,9 +24,6 @@ export default {
     },
     web: {
       favicon: "./assets/favicon.png"
-    },
-    extra: {
-      newsApiKey: process.env.NEWS_API_KEY
     }
   }
 };
