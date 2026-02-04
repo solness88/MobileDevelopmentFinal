@@ -2,7 +2,7 @@ import React, { createContext, useEffect,useState, useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Switch,ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Switch, ActivityIndicator, Linking } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { styles } from './styles';
@@ -192,86 +192,156 @@ function ArticleScreen({ navigation, route }) {
   const [fullContent, setFullContent] = useState('');
   const [loading, setLoading] = useState(true);
 
+  const cleanWikipediaText = (text) => {
+    let cleaned = text;
+    cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+    cleaned = cleaned.replace(/\{\\displaystyle[^}]*\}/g, '');
+    cleaned = cleaned.replace(/\\mathbb\{[^}]*\}/g, '');
+    cleaned = cleaned.replace(/\\[a-zA-Z]+\{[^}]*\}/g, '');
+    cleaned = cleaned.replace(/\[edit\]/gi, '');
+    cleaned = cleaned.replace(/\[\d+\]/g, '');
+    cleaned = cleaned.replace(/\[citation needed\]/gi, '');
+    cleaned = cleaned.replace(/For the [^,]+, see [^.]+\./gi, '');
+    cleaned = cleaned.replace(/This article is about [^.]+\./gi, '');
+    cleaned = cleaned.replace(/\d+°\d+′\d+″[NS]\s+\d+°\d+′\d+″[EW]/g, '');
+    cleaned = cleaned.replace(/\(\s*animated version\s*\)/gi, '');
+    cleaned = cleaned.replace(/\(\s*pronunciation[^)]*\)/gi, '');
+    cleaned = cleaned.replace(/\s+/g, ' ');
+    cleaned = cleaned.replace(/\.\s+([A-Z])/g, '.\n\n$1');
+    cleaned = cleaned.trim();
+    return cleaned;
+  };
+
   useEffect(() => {
     const fetchFullArticle = async () => {
       setLoading(true);
       try {
-        // デバッグ: pageTitleが正しく取得できているか確認
         console.log('Fetching article:', article.pageTitle);
         
         if (!article.pageTitle) {
           throw new Error('Article pageTitle is missing');
         }
         
-        // User-Agentにメールアドレスを含める（your-email@example.comを実際のメールに変更）
-        const USER_AGENT = 'WikiReaderApp/1.0 (solness.stf@gmail.com; Educational Project)';
+        const USER_AGENT = 'WikiReaderApp/1.0 (your-email@example.com; Educational Project)';
         
-        // まずsummaryエンドポイントで取得（これは安定している）
-        const summaryResponse = await fetch(
-          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(article.pageTitle)}`,
+        // 1. セクション情報を取得
+        const sectionsResponse = await fetch(
+          `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(article.pageTitle)}&prop=sections&formatversion=2&format=json&origin=*`,
           {
             headers: {
-              'User-Agent': USER_AGENT,
-              'Api-User-Agent': USER_AGENT
+              'User-Agent': USER_AGENT
             }
           }
         );
         
-        if (!summaryResponse.ok) {
-          throw new Error(`HTTP error! status: ${summaryResponse.status}`);
+        const sectionsData = await sectionsResponse.json();
+        
+        if (sectionsData.error) {
+          throw new Error(sectionsData.error.info);
         }
         
-        const summaryData = await summaryResponse.json();
+        const sections = sectionsData.parse.sections;
+        console.log('Available sections:', sections.map(s => `${s.index}: ${s.line}`));
         
-        // extract_html があればHTMLタグを削除して使用
-        let fullText = '';
+        // 除外するセクション
+        const excludeSections = [
+          'references',
+          'see also',
+          'external links',
+          'notes',
+          'further reading',
+          'bibliography',
+          'sources',
+          'citations'
+        ];
         
-        if (summaryData.extract_html) {
-          fullText = summaryData.extract_html
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-        } else if (summaryData.extract) {
-          fullText = summaryData.extract;
+        // 優先的に含めるセクション（読み物として面白い）
+        const preferredSections = [
+          'description',
+          'overview',
+          'history',
+          'background',
+          'characteristics',
+          'features'
+        ];
+        
+        // メインコンテンツのセクションをフィルタリング
+        const mainSections = sections.filter(section => {
+          const lineLower = section.line.toLowerCase();
+          // 除外リストに該当しない
+          return !excludeSections.some(excluded => lineLower.includes(excluded));
+        });
+        
+        // 優先セクションを探す
+        const prioritySections = mainSections.filter(section => {
+          const lineLower = section.line.toLowerCase();
+          return preferredSections.some(preferred => lineLower.includes(preferred));
+        });
+        
+        // 取得するセクション: Lead (0) + 優先セクション + その他の最初の数個
+        let sectionsToFetch = []; // Lead section
+        
+        if (prioritySections.length > 0) {
+          // 優先セクションがあればそれを追加（最大3つ）
+          sectionsToFetch.push(...prioritySections.slice(0, 3).map(s => s.index));
+        } else {
+          // なければ最初の3セクション
+          sectionsToFetch.push(...mainSections.slice(0, 3).map(s => s.index));
         }
         
-        // より詳細な本文が必要な場合は、mobile-htmlを試す（fallback）
-        if (fullText.length < 500) {
+        console.log('Fetching section indices:', sectionsToFetch);
+        
+        // 2. 各セクションの本文を取得
+        let allText = '';
+        
+        for (const sectionIndex of sectionsToFetch) {
           try {
-            const htmlResponse = await fetch(
-              `https://en.wikipedia.org/api/rest_v1/page/mobile-html/${encodeURIComponent(article.pageTitle)}`,
+            const textResponse = await fetch(
+              `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(article.pageTitle)}&prop=text&section=${sectionIndex}&formatversion=2&format=json&origin=*`,
               {
                 headers: {
-                  'User-Agent': USER_AGENT,
-                  'Api-User-Agent': USER_AGENT
+                  'User-Agent': USER_AGENT
                 }
               }
             );
             
-            if (htmlResponse.ok) {
-              const htmlText = await htmlResponse.text();
-              // HTMLから本文を抽出（簡易版）
-              const textOnly = htmlText
-                .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-                .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-                .replace(/<[^>]+>/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
+            const textData = await textResponse.json();
+            
+            if (textData.parse && textData.parse.text) {
+              let sectionHtml = textData.parse.text;
               
-              if (textOnly.length > fullText.length) {
-                fullText = textOnly;
+              // 不要な要素を削除
+              sectionHtml = sectionHtml.replace(/<table class="infobox[\s\S]*?<\/table>/gi, '');
+              sectionHtml = sectionHtml.replace(/<table class="wikitable[\s\S]*?<\/table>/gi, '');
+              sectionHtml = sectionHtml.replace(/<sup[^>]*>[\s\S]*?<\/sup>/gi, '');
+              sectionHtml = sectionHtml.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+              sectionHtml = sectionHtml.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+              
+              const cleanedText = cleanWikipediaText(sectionHtml);
+              
+              if (cleanedText.length > 50) {
+                allText += cleanedText + '\n\n';
               }
             }
-          } catch (htmlError) {
-            console.log('mobile-html fetch failed, using summary only');
+          } catch (error) {
+            console.error(`Error fetching section ${sectionIndex}:`, error.message);
           }
         }
         
-        setFullContent(fullText || article.description || '本文を取得できませんでした。');
+        // 長さ調整（2000〜3000文字程度）
+        const targetLength = 2500;
+        let finalText = allText;
+        
+        if (allText.length > targetLength) {
+          const truncated = allText.substring(0, targetLength);
+          const lastPeriod = truncated.lastIndexOf('.');
+          finalText = lastPeriod > 1500 ? truncated.substring(0, lastPeriod + 1) : truncated;
+        }
+        
+        setFullContent(finalText || article.description || '本文を取得できませんでした。');
         
       } catch (error) {
         console.error('Fetch Full Article Error:', error.message);
-        console.error('Article pageTitle:', article?.pageTitle);
         setFullContent(article.description || '本文を取得できませんでした。');
       } finally {
         setLoading(false);
@@ -327,9 +397,20 @@ function ArticleScreen({ navigation, route }) {
         {loading ? (
           <ActivityIndicator size="large" color="#000" style={{ marginTop: 30 }} />
         ) : (
-          <Text style={[styles.bodyText, { fontSize: textSize }]}>
-            {fullContent}
-          </Text>
+          <>
+            <Text style={[styles.bodyText, { fontSize: textSize }]}>
+              {fullContent}
+            </Text>
+            
+            {article.url && (
+              <TouchableOpacity 
+                style={{ margin: 15, padding: 10, borderWidth: 1, borderColor: '#007AFF', alignItems: 'center' }}
+                onPress={() => Linking.openURL(article.url)}
+              >
+                <Text style={{ color: '#007AFF' }}>Read more on Wikipedia →</Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
         
         <View style={styles.rowAround}>
@@ -344,6 +425,7 @@ function ArticleScreen({ navigation, route }) {
     </View>
   );
 }
+
 // --- 4. Setting Screen ---
 function SettingScreen() {
   const { country, setCountry, isDark, setIsDark, textSize, setTextSize } = useContext(SettingsContext);
