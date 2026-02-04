@@ -137,4 +137,12 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 1, 
     borderColor: '#eee' 
   },
+  featuredImage: { 
+    height: 200,
+    width: '100%', // 追加
+    backgroundColor: '#eee', 
+    margin: 15, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
 });

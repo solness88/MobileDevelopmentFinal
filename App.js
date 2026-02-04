@@ -7,6 +7,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { styles } from './styles';
 import Constants from 'expo-constants';
+import { WebView } from 'react-native-webview';
 
 const SettingsContext = createContext();
 
@@ -97,9 +98,6 @@ function HomeScreen({ navigation }) {
   );
 }
 
-
-
-
 // --- 2. Archive Screen ---
 function ArchiveScreen() {
   return (
@@ -123,25 +121,21 @@ function ArchiveScreen() {
 }
 
 // --- 3. Article Screen (Reader View) ---
-function ArticleScreen({ navigation }) {
-  const { textSize } = useContext(SettingsContext);
+function ArticleScreen({ navigation, route }) {
+  const { article } = route.params || {};
+  
   return (
     <View style={styles.flex1}>
-      <View style={styles.header}><Text style={styles.headerText}>News Reader</Text></View>
-      <ScrollView style={styles.container}>
-        <Text style={styles.sectionLabel}>Selected article</Text>
-        <Text style={styles.largeHeadline}>Sustainable energy breakthrough in 2026</Text>
-        <Text style={styles.meta}>By Hiro Koba • Jan 18, 2026</Text>
-        <View style={styles.featuredImage}><Text>Featured Image</Text></View>
-        <Text style={[styles.bodyText, { fontSize: textSize }]}>
-          This is the main content area where the news article is displayed with optimised line height.
-          No ads, no distractions. Just the information the user saved earlier.
-        </Text>
-        <View style={styles.rowAround}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}><Text>BACK</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.delBtn}><Text>DELETE</Text></TouchableOpacity>
-        </View>
-      </ScrollView>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text>← BACK</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerText}>{article.source.name}</Text>
+      </View>
+      <WebView 
+        source={{ uri: article.url }}
+        style={styles.flex1}
+      />
     </View>
   );
 }
