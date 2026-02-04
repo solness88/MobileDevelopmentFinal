@@ -11,6 +11,8 @@ const SettingsContext = createContext();
 
 // --- 1. Home Screen (カテゴリー選択) ---
 function HomeScreen({ navigation }) {
+  const [selectedDifficulty, setSelectedDifficulty] = useState('medium'); // デフォルトはmedium
+
   const categories = [
     { id: 9, name: 'General Knowledge', icon: '🎯', color: '#FF6B6B' },
     { id: 17, name: 'Science & Nature', icon: '🔬', color: '#4ECDC4' },
@@ -20,18 +22,36 @@ function HomeScreen({ navigation }) {
     { id: 22, name: 'Geography', icon: '🌍', color: '#6C5CE7' }
   ];
 
+  const difficulties = [
+    { value: 'easy', label: 'Easy', emoji: '😊' },
+    { value: 'medium', label: 'Medium', emoji: '🤔' },
+    { value: 'hard', label: 'Hard', emoji: '🔥' }
+  ];
+
   return (
     <View style={styles.flex1}>
       <View style={styles.header}>
         <Text style={styles.headerText}>Daily Quiz</Text>
       </View>
       
-      {/* 難易度選択（今後実装） */}
+      {/* 難易度選択 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
-        {['Easy', 'Medium', 'Hard'].map(difficulty => (
-          <View key={difficulty} style={styles.catChip}>
-            <Text>{difficulty}</Text>
-          </View>
+        {difficulties.map(difficulty => (
+          <TouchableOpacity
+            key={difficulty.value}
+            style={[
+              styles.catChip,
+              selectedDifficulty === difficulty.value && { 
+                backgroundColor: '#007AFF', 
+                borderColor: '#007AFF' 
+              }
+            ]}
+            onPress={() => setSelectedDifficulty(difficulty.value)}
+          >
+            <Text style={selectedDifficulty === difficulty.value && { color: '#fff' }}>
+              {difficulty.emoji} {difficulty.label}
+            </Text>
+          </TouchableOpacity>
         ))}
       </ScrollView>
 
@@ -44,14 +64,17 @@ function HomeScreen({ navigation }) {
             style={styles.homeCard}
             onPress={() => navigation.navigate('Quiz', { 
               categoryId: category.id,
-              categoryName: category.name 
+              categoryName: category.name,
+              difficulty: selectedDifficulty // 難易度を渡す
             })}
           >
             <View style={[styles.cardContent, { flexDirection: 'row', alignItems: 'center' }]}>
               <Text style={{ fontSize: 50, marginRight: 15 }}>{category.icon}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.boldTitle}>{category.name}</Text>
-                <Text style={styles.meta}>Tap to start 10 questions</Text>
+                <Text style={styles.meta}>
+                  {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} • 10 questions
+                </Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -63,7 +86,7 @@ function HomeScreen({ navigation }) {
 
 // --- 2. Quiz Screen ---
 function QuizScreen({ navigation, route }) {
-  const { categoryId, categoryName } = route.params;
+  const { categoryId, categoryName, difficulty } = route.params; // difficultyを追加
   const [questions, setQuestions] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [score, setScore] = useState(0);
@@ -75,13 +98,14 @@ function QuizScreen({ navigation, route }) {
     fetchQuestions();
   }, []);
 
-  // スコアを保存する関数
+  // スコアを保存する関数（難易度も保存）
   const saveScore = async (finalScore, totalQuestions) => {
     try {
       const quizResult = {
-        id: Date.now().toString(), // ユニークID
+        id: Date.now().toString(),
         category: categoryName,
         categoryId: categoryId,
+        difficulty: difficulty, // 難易度を追加
         score: finalScore,
         total: totalQuestions,
         percentage: Math.round((finalScore / totalQuestions) * 100),
@@ -89,19 +113,15 @@ function QuizScreen({ navigation, route }) {
         timestamp: Date.now()
       };
 
-      // 既存の履歴を取得
       const existingHistory = await AsyncStorage.getItem('quizHistory');
       const history = existingHistory ? JSON.parse(existingHistory) : [];
 
-      // 新しい結果を追加
-      history.unshift(quizResult); // 最新が最初に来るように
+      history.unshift(quizResult);
 
-      // 最大50件まで保存（古いものを削除）
       if (history.length > 50) {
         history.pop();
       }
 
-      // 保存
       await AsyncStorage.setItem('quizHistory', JSON.stringify(history));
       console.log('Score saved successfully:', quizResult);
 
@@ -113,10 +133,23 @@ function QuizScreen({ navigation, route }) {
   const fetchQuestions = async () => {
     setLoading(true);
     try {
+      // APIリクエストに難易度を追加
       const response = await fetch(
-        `https://opentdb.com/api.php?amount=10&category=${categoryId}&type=multiple`
+        `https://opentdb.com/api.php?amount=10&category=${categoryId}&difficulty=${difficulty}&type=multiple`
       );
       const data = await response.json();
+      
+      console.log(`Fetching ${difficulty} questions for category ${categoryId}`);
+      
+      if (data.results.length === 0) {
+        console.warn('No questions available for this difficulty/category combination');
+        // フォールバック: 難易度なしで再取得
+        const fallbackResponse = await fetch(
+          `https://opentdb.com/api.php?amount=10&category=${categoryId}&type=multiple`
+        );
+        const fallbackData = await fallbackResponse.json();
+        data.results = fallbackData.results;
+      }
       
       const formattedQuestions = data.results.map(q => {
         const allAnswers = [...q.incorrect_answers, q.correct_answer];
@@ -162,7 +195,6 @@ function QuizScreen({ navigation, route }) {
         setCurrentQuestion(currentQuestion + 1);
         setSelectedAnswer(null);
       } else {
-        // 最後の質問なので結果を保存
         const finalScore = answer === questions[currentQuestion].correct_answer ? newScore : score;
         saveScore(finalScore, questions.length);
         setShowResult(true);
@@ -174,7 +206,7 @@ function QuizScreen({ navigation, route }) {
     return (
       <View style={[styles.flex1, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#000" />
-        <Text style={{ marginTop: 10 }}>Loading questions...</Text>
+        <Text style={{ marginTop: 10 }}>Loading {difficulty} questions...</Text>
       </View>
     );
   }
@@ -193,6 +225,9 @@ function QuizScreen({ navigation, route }) {
             Your Score: {score}/{questions.length}
           </Text>
           <Text style={[styles.meta, { textAlign: 'center', marginTop: 10 }]}>
+            {categoryName} • {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+          </Text>
+          <Text style={[styles.meta, { textAlign: 'center', marginTop: 5 }]}>
             {score >= 7 ? 'Excellent!' : score >= 5 ? 'Good job!' : 'Keep learning!'}
           </Text>
           
@@ -233,7 +268,9 @@ function QuizScreen({ navigation, route }) {
 
       <ScrollView style={styles.container}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', margin: 15 }}>
-          <Text style={styles.meta}>Question {currentQuestion + 1}/{questions.length}</Text>
+          <Text style={styles.meta}>
+            Question {currentQuestion + 1}/{questions.length} • {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+          </Text>
           <Text style={styles.meta}>Score: {score}</Text>
         </View>
 
@@ -416,7 +453,9 @@ function HistoryScreen() {
                   <Text style={styles.boldTitle}>
                     Score: {item.score}/{item.total} ({item.percentage}%)
                   </Text>
-                  <Text style={styles.meta}>{formatDate(item.date)}</Text>
+                  <Text style={styles.meta}>
+                    {item.difficulty ? item.difficulty.charAt(0).toUpperCase() + item.difficulty.slice(1) : 'Mixed'} • {formatDate(item.date)}
+                  </Text>
                 </View>
                 <Text style={{ fontSize: 30 }}>
                   {item.percentage >= 70 ? '🎉' : item.percentage >= 50 ? '👍' : '📚'}
