@@ -1,7 +1,7 @@
 export default {
   expo: {
-    name: "news-reader-app",
-    slug: "news-reader-app",
+    name: "Daily Quiz",
+    slug: "daily-quiz-app",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
