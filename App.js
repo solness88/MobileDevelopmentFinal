@@ -5,6 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { styles } from './styles';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SettingsContext = createContext();
 
@@ -74,6 +75,41 @@ function QuizScreen({ navigation, route }) {
     fetchQuestions();
   }, []);
 
+  // スコアを保存する関数
+  const saveScore = async (finalScore, totalQuestions) => {
+    try {
+      const quizResult = {
+        id: Date.now().toString(), // ユニークID
+        category: categoryName,
+        categoryId: categoryId,
+        score: finalScore,
+        total: totalQuestions,
+        percentage: Math.round((finalScore / totalQuestions) * 100),
+        date: new Date().toISOString(),
+        timestamp: Date.now()
+      };
+
+      // 既存の履歴を取得
+      const existingHistory = await AsyncStorage.getItem('quizHistory');
+      const history = existingHistory ? JSON.parse(existingHistory) : [];
+
+      // 新しい結果を追加
+      history.unshift(quizResult); // 最新が最初に来るように
+
+      // 最大50件まで保存（古いものを削除）
+      if (history.length > 50) {
+        history.pop();
+      }
+
+      // 保存
+      await AsyncStorage.setItem('quizHistory', JSON.stringify(history));
+      console.log('Score saved successfully:', quizResult);
+
+    } catch (error) {
+      console.error('Error saving score:', error);
+    }
+  };
+
   const fetchQuestions = async () => {
     setLoading(true);
     try {
@@ -82,7 +118,6 @@ function QuizScreen({ navigation, route }) {
       );
       const data = await response.json();
       
-      // 選択肢をシャッフル
       const formattedQuestions = data.results.map(q => {
         const allAnswers = [...q.incorrect_answers, q.correct_answer];
         const shuffled = allAnswers.sort(() => Math.random() - 0.5);
@@ -103,7 +138,6 @@ function QuizScreen({ navigation, route }) {
     }
   };
 
-  // HTMLエンティティをデコード
   const decodeHTML = (html) => {
     return html
       .replace(/&quot;/g, '"')
@@ -117,16 +151,20 @@ function QuizScreen({ navigation, route }) {
   const handleAnswer = (answer) => {
     setSelectedAnswer(answer);
     
+    const newScore = answer === questions[currentQuestion].correct_answer ? score + 1 : score;
+    
     if (answer === questions[currentQuestion].correct_answer) {
-      setScore(score + 1);
+      setScore(newScore);
     }
     
-    // 次の質問へ（1秒後）
     setTimeout(() => {
       if (currentQuestion < questions.length - 1) {
         setCurrentQuestion(currentQuestion + 1);
         setSelectedAnswer(null);
       } else {
+        // 最後の質問なので結果を保存
+        const finalScore = answer === questions[currentQuestion].correct_answer ? newScore : score;
+        saveScore(finalScore, questions.length);
         setShowResult(true);
       }
     }, 1000);
@@ -240,15 +278,162 @@ function QuizScreen({ navigation, route }) {
 
 // --- 3. History Screen (履歴) ---
 function HistoryScreen() {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalQuizzes: 0,
+    totalQuestions: 0,
+    totalCorrect: 0,
+    averageScore: 0
+  });
+
+  useEffect(() => {
+    loadHistory();
+    
+    // 画面がフォーカスされたときに履歴を再読み込み
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadHistory();
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const loadHistory = async () => {
+    setLoading(true);
+    try {
+      const savedHistory = await AsyncStorage.getItem('quizHistory');
+      const historyData = savedHistory ? JSON.parse(savedHistory) : [];
+      setHistory(historyData);
+
+      // 統計を計算
+      if (historyData.length > 0) {
+        const totalQuizzes = historyData.length;
+        const totalQuestions = historyData.reduce((sum, item) => sum + item.total, 0);
+        const totalCorrect = historyData.reduce((sum, item) => sum + item.score, 0);
+        const averageScore = Math.round((totalCorrect / totalQuestions) * 100);
+
+        setStats({
+          totalQuizzes,
+          totalQuestions,
+          totalCorrect,
+          averageScore
+        });
+      }
+    } catch (error) {
+      console.error('Error loading history:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearHistory = async () => {
+    try {
+      await AsyncStorage.removeItem('quizHistory');
+      setHistory([]);
+      setStats({
+        totalQuizzes: 0,
+        totalQuestions: 0,
+        totalCorrect: 0,
+        averageScore: 0
+      });
+    } catch (error) {
+      console.error('Error clearing history:', error);
+    }
+  };
+
+  const formatDate = (isoString) => {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) {
+      return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.flex1, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#000" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.flex1}>
       <View style={styles.header}>
         <Text style={styles.headerText}>Quiz History</Text>
       </View>
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={styles.sectionLabel}>Coming Soon!</Text>
-        <Text style={styles.meta}>Your quiz history will appear here</Text>
-      </View>
+
+      {history.length === 0 ? (
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{ fontSize: 60, marginBottom: 20 }}>📊</Text>
+          <Text style={styles.sectionLabel}>No quiz history yet</Text>
+          <Text style={styles.meta}>Complete a quiz to see your results here</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.flex1}>
+          {/* 統計サマリー */}
+          <View style={{ margin: 15, padding: 15, backgroundColor: '#f0f0f0', borderRadius: 8 }}>
+            <Text style={[styles.boldTitle, { marginBottom: 10 }]}>Your Stats</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+              <Text style={styles.meta}>Total Quizzes:</Text>
+              <Text style={styles.boldTitle}>{stats.totalQuizzes}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+              <Text style={styles.meta}>Questions Answered:</Text>
+              <Text style={styles.boldTitle}>{stats.totalQuestions}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+              <Text style={styles.meta}>Correct Answers:</Text>
+              <Text style={styles.boldTitle}>{stats.totalCorrect}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={styles.meta}>Average Score:</Text>
+              <Text style={[styles.boldTitle, { color: stats.averageScore >= 70 ? '#4ECDC4' : '#FF6B6B' }]}>
+                {stats.averageScore}%
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.sectionLabel}>Recent Quizzes</Text>
+
+          {/* 履歴リスト */}
+          {history.map((item) => (
+            <View key={item.id} style={styles.archiveCard}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.tag}>[{item.category}]</Text>
+                  <Text style={styles.boldTitle}>
+                    Score: {item.score}/{item.total} ({item.percentage}%)
+                  </Text>
+                  <Text style={styles.meta}>{formatDate(item.date)}</Text>
+                </View>
+                <Text style={{ fontSize: 30 }}>
+                  {item.percentage >= 70 ? '🎉' : item.percentage >= 50 ? '👍' : '📚'}
+                </Text>
+              </View>
+            </View>
+          ))}
+
+          {/* クリアボタン */}
+          <TouchableOpacity 
+            style={[styles.delBtn, { margin: 15, padding: 15, alignItems: 'center' }]}
+            onPress={clearHistory}
+          >
+            <Text style={{ color: 'red' }}>Clear All History</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -300,7 +485,9 @@ export default function App() {
       <NavigationContainer>
         <Tab.Navigator screenOptions={{ headerShown: false }}>
           <Tab.Screen name="Home" component={HomeStack} />
-          <Tab.Screen name="History" component={HistoryScreen} />
+          <Tab.Screen name="History">
+            {(props) => <HistoryScreen {...props} />}
+          </Tab.Screen>
           <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
       </NavigationContainer>
