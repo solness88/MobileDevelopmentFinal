@@ -4,22 +4,22 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
-import { styles } from './styles';
+import { styles, colors } from './styles';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SettingsContext = createContext();
 
-// --- 1. Home Screen (カテゴリー選択) ---
+// --- 1. Home Screen (Select category) ---
 function HomeScreen({ navigation }) {
-  const [selectedDifficulty, setSelectedDifficulty] = useState('medium'); // デフォルトはmedium
+  const [selectedDifficulty, setSelectedDifficulty] = useState('medium'); // Default defficulty is medium
 
   const categories = [
-    { id: 9, name: 'General Knowledge', icon: '🎯', color: '#FF6B6B' },
-    { id: 17, name: 'Science & Nature', icon: '🔬', color: '#4ECDC4' },
-    { id: 23, name: 'History', icon: '📚', color: '#45B7D1' },
-    { id: 21, name: 'Sports', icon: '⚽', color: '#FFA07A' },
-    { id: 11, name: 'Film', icon: '🎬', color: '#98D8C8' },
-    { id: 22, name: 'Geography', icon: '🌍', color: '#6C5CE7' }
+    { id: 9, name: 'General Knowledge', icon: '🎯', color: colors.categories.general },
+    { id: 17, name: 'Science & Nature', icon: '🔬', color: colors.categories.science },
+    { id: 23, name: 'History', icon: '📚', color: colors.categories.history },
+    { id: 21, name: 'Sports', icon: '⚽', color: colors.categories.sports },
+    { id: 11, name: 'Film', icon: '🎬', color: colors.categories.film },
+    { id: 22, name: 'Geography', icon: '🌍', color: colors.categories.geography }
   ];
 
   const difficulties = [
@@ -61,15 +61,25 @@ function HomeScreen({ navigation }) {
         {categories.map((category) => (
           <TouchableOpacity 
             key={category.id}
-            style={styles.homeCard}
+            style={[styles.homeCard, { borderLeftWidth: 4, borderLeftColor: category.color }]}
             onPress={() => navigation.navigate('Quiz', { 
               categoryId: category.id,
               categoryName: category.name,
-              difficulty: selectedDifficulty // 難易度を渡す
+              difficulty: selectedDifficulty
             })}
           >
             <View style={[styles.cardContent, { flexDirection: 'row', alignItems: 'center' }]}>
-              <Text style={{ fontSize: 50, marginRight: 15 }}>{category.icon}</Text>
+              <View style={{ 
+                width: 60, 
+                height: 60, 
+                borderRadius: 30, 
+                backgroundColor: category.color + '20', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                marginRight: 15
+              }}>
+                <Text style={{ fontSize: 30 }}>{category.icon}</Text>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.boldTitle}>{category.name}</Text>
                 <Text style={styles.meta}>
@@ -232,14 +242,14 @@ function QuizScreen({ navigation, route }) {
           </Text>
           
           <TouchableOpacity 
-            style={[styles.backBtn, { marginTop: 30, width: 200 }]}
+            style={[styles.secondaryButton, { marginTop: 30, width: 200 }]}
             onPress={() => navigation.goBack()}
           >
-            <Text>Back to Categories</Text>
+            <Text style={styles.secondaryButtonText}>Back to Categories</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity 
-            style={[styles.saveBtn, { marginTop: 15, width: 200 }]}
+            style={[styles.primaryButton, { marginTop: 15, width: 200 }]}
             onPress={() => {
               setCurrentQuestion(0);
               setScore(0);
@@ -248,8 +258,9 @@ function QuizScreen({ navigation, route }) {
               fetchQuestions();
             }}
           >
-            <Text>Try Again</Text>
+            <Text style={styles.primaryButtonText}>Try Again</Text>
           </TouchableOpacity>
+
         </View>
       </View>
     );
@@ -260,9 +271,9 @@ function QuizScreen({ navigation, route }) {
   return (
     <View style={styles.flex1}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={{ position: 'absolute', left: 15 }}>
-          <Text style={{ fontSize: 16 }}>← Back</Text>
-        </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={{ position: 'absolute', left: 15 }}>
+        <Text style={{ fontSize: 16, color: colors.primary, fontWeight: '600' }}>← Back</Text>
+      </TouchableOpacity>
         <Text style={styles.headerText}>{categoryName}</Text>
       </View>
 
@@ -536,10 +547,10 @@ function HistoryScreen({ navigation }) {
 
           {/* クリアボタン */}
           <TouchableOpacity 
-            style={[styles.delBtn, { margin: 15, padding: 15, alignItems: 'center' }]}
+            style={[styles.dangerButton, { margin: 15 }]}
             onPress={clearHistory}
           >
-            <Text style={{ color: 'red' }}>Clear All History</Text>
+            <Text style={styles.dangerButtonText}>Clear All History</Text>
           </TouchableOpacity>
         </ScrollView>
       )}

@@ -2,6 +2,30 @@ import { StyleSheet, Dimensions } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
+export const colors = {
+  primary: '#4ECDC4',      // main color(Turquoise)
+  primaryDark: '#3AB5AC',  // Strong Turquoise
+  secondary: '#FF6B6B',    // Accent color(red)
+  success: '#4ECDC4',      // Success（green turquoise）
+  warning: '#FFA07A',      // Warning（Orange）
+  danger: '#FF6B6B',       // Danger（red）
+  background: '#F7F7F7',   // background
+  cardBackground: '#FFFFFF', // Card background
+  text: '#333333',         // Text
+  textLight: '#888888',    // Light text
+  border: '#E0E0E0',       // Border
+  
+  // Category color
+  categories: {
+    general: '#FF6B6B',
+    science: '#4ECDC4',
+    history: '#45B7D1',
+    sports: '#FFA07A',
+    film: '#98D8C8',
+    geography: '#6C5CE7'
+  }
+};
+
 export const styles = StyleSheet.create({
   flex1: {
     flex: 1, backgroundColor: '#fff'
@@ -144,5 +168,76 @@ export const styles = StyleSheet.create({
     margin: 15, 
     justifyContent: 'center', 
     alignItems: 'center' 
+  },
+  // Button styles
+  primaryButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 120,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 120,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  secondaryButtonText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dangerButton: {
+    backgroundColor: colors.danger,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 120,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dangerButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  outlineButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 120,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  outlineButtonText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
