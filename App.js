@@ -243,11 +243,11 @@ function QuizScreen({ navigation, route }) {
           
           <TouchableOpacity 
             style={[styles.secondaryButton, { marginTop: 30, width: 200 }]}
-            onPress={() => navigation.goBack()}
+            onPress={() => navigation.navigate('MainHome')}
           >
-            <Text style={styles.secondaryButtonText}>Back to Categories</Text>
+            <Text style={styles.secondaryButtonText}>← HOME</Text>
           </TouchableOpacity>
-
+  
           <TouchableOpacity 
             style={[styles.primaryButton, { marginTop: 15, width: 200 }]}
             onPress={() => {
@@ -260,7 +260,7 @@ function QuizScreen({ navigation, route }) {
           >
             <Text style={styles.primaryButtonText}>Try Again</Text>
           </TouchableOpacity>
-
+  
         </View>
       </View>
     );
@@ -271,9 +271,9 @@ function QuizScreen({ navigation, route }) {
   return (
     <View style={styles.flex1}>
       <View style={styles.header}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={{ position: 'absolute', left: 15 }}>
-        <Text style={{ fontSize: 16, color: colors.primary, fontWeight: '600' }}>← Back</Text>
-      </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ position: 'absolute', left: 15 }}>
+          <Text style={{ fontSize: 16, color: '#fff', fontWeight: '600' }}>←BACK</Text>
+        </TouchableOpacity>
         <Text style={styles.headerText}>{categoryName}</Text>
       </View>
 

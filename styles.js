@@ -31,16 +31,22 @@ export const styles = StyleSheet.create({
     flex: 1, backgroundColor: '#fff'
   },
   header: {
-     height: 60, 
-     borderBottomWidth: 1, 
-     borderColor: '#ccc', 
-     justifyContent: 'center', 
-     alignItems: 'center', 
-     marginTop: 40
+    height: 60, 
+    backgroundColor: colors.primary,
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginTop: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 4,
   },
   headerText: { 
-    fontSize: 18, 
-    fontWeight: 'bold' 
+    fontSize: 20, 
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
   catScroll: { 
     paddingVertical: 10, 
