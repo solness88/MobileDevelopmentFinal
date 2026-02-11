@@ -68,9 +68,16 @@ export const styles = StyleSheet.create({
     margin: 15 
   },
   homeCard: { 
-    margin: 15, 
-    borderWidth: 1, 
-    borderColor: '#ccc' 
+    margin: 15,
+    marginHorizontal: 20,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    overflow: 'hidden',
   },
   imagePlaceholder: { 
     height: width * (9/16), 
@@ -79,7 +86,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center' 
   }, // 16:9を動的に計算
   cardContent: { 
-    padding: 10 
+    padding: 16 
   },
   archiveCard: { 
     marginHorizontal: 15, 
@@ -245,5 +252,206 @@ export const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 16,
     fontWeight: '600',
+  },
+  categoryCardEnhanced: {
+    margin: 15,
+    marginHorizontal: 20,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  categoryAccentBar: {
+    height: 4,
+    width: '100%',
+  },
+  categoryCardBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  categoryIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  categoryIcon: {
+    fontSize: 32,
+  },
+  categoryTextContainer: {
+    flex: 1,
+  },
+  categoryTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  categoryMeta: {
+    fontSize: 13,
+    color: colors.textLight,
+  },
+  categoryArrow: {
+    fontSize: 20,
+    color: colors.textLight,
+    marginLeft: 8,
+  },
+  quizContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  quizQuestionContainer: {
+    margin: 20,
+    padding: 20,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  quizQuestionText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.text,
+    lineHeight: 28,
+    textAlign: 'center',
+  },
+  quizProgress: {
+    fontSize: 14,
+    color: colors.textLight,
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  quizOptionsContainer: {
+    paddingHorizontal: 20,
+  },
+  optionButton: {
+    backgroundColor: colors.cardBackground,
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  optionButtonSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '10',
+  },
+  optionButtonCorrect: {
+    borderColor: colors.success,
+    backgroundColor: colors.success + '20',
+  },
+  optionButtonIncorrect: {
+    borderColor: colors.danger,
+    backgroundColor: colors.danger + '20',
+  },
+  optionText: {
+    fontSize: 16,
+    color: colors.text,
+    fontWeight: '500',
+    lineHeight: 24,
+  },
+  optionTextSelected: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  resultContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: colors.background,
+  },
+  resultEmoji: {
+    fontSize: 80,
+    marginBottom: 20,
+  },
+  resultTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  resultScore: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: colors.primary,
+    marginBottom: 8,
+  },
+  resultPercentage: {
+    fontSize: 20,
+    color: colors.textLight,
+    marginBottom: 30,
+  },
+  resultStatsContainer: {
+    backgroundColor: colors.cardBackground,
+    padding: 20,
+    borderRadius: 16,
+    width: '100%',
+    marginBottom: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  resultStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  resultStatRowLast: {
+    borderBottomWidth: 0,
+  },
+  resultStatLabel: {
+    fontSize: 16,
+    color: colors.textLight,
+  },
+  resultStatValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  resultButtonsContainer: {
+    width: '100%',
+    gap: 12,
+  },
+  difficultyChip: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: colors.border,
+    marginRight: 10,
+    marginLeft: 10,
+    backgroundColor: colors.cardBackground,
+  },
+  difficultyChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  difficultyChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  difficultyChipTextSelected: {
+    color: '#fff',
   },
 });

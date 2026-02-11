@@ -40,15 +40,19 @@ function HomeScreen({ navigation }) {
           <TouchableOpacity
             key={difficulty.value}
             style={[
-              styles.catChip,
+              styles.difficultyChip,
               selectedDifficulty === difficulty.value && { 
                 backgroundColor: '#007AFF', 
                 borderColor: '#007AFF' 
               }
             ]}
             onPress={() => setSelectedDifficulty(difficulty.value)}
+            activeOpacity={0.7}
           >
-            <Text style={selectedDifficulty === difficulty.value && { color: '#fff' }}>
+            <Text style={[
+              styles.difficultyChipText,
+              selectedDifficulty === difficulty.value && { color: '#fff' }
+            ]}>
               {difficulty.emoji} {difficulty.label}
             </Text>
           </TouchableOpacity>
@@ -59,35 +63,33 @@ function HomeScreen({ navigation }) {
         <Text style={styles.sectionLabel}>Choose a Category</Text>
         
         {categories.map((category) => (
-          <TouchableOpacity 
-            key={category.id}
-            style={[styles.homeCard, { borderLeftWidth: 4, borderLeftColor: category.color }]}
-            onPress={() => navigation.navigate('Quiz', { 
-              categoryId: category.id,
-              categoryName: category.name,
-              difficulty: selectedDifficulty
-            })}
-          >
-            <View style={[styles.cardContent, { flexDirection: 'row', alignItems: 'center' }]}>
-              <View style={{ 
-                width: 60, 
-                height: 60, 
-                borderRadius: 30, 
-                backgroundColor: category.color + '20', 
-                justifyContent: 'center', 
-                alignItems: 'center',
-                marginRight: 15
-              }}>
-                <Text style={{ fontSize: 30 }}>{category.icon}</Text>
+        <TouchableOpacity 
+          key={category.id}
+          style={styles.categoryCardEnhanced}
+          onPress={() => navigation.navigate('Quiz', { 
+            categoryId: category.id,
+            categoryName: category.name,
+            difficulty: selectedDifficulty
+          })}
+          activeOpacity={0.7}
+        >
+            <View style={[styles.categoryAccentBar, { backgroundColor: category.color }]} />
+            <View style={styles.categoryCardBody}>
+              <View style={[
+                styles.categoryIconContainer,
+                { backgroundColor: category.color + '20' }
+              ]}>
+                <Text style={styles.categoryIcon}>{category.icon}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.boldTitle}>{category.name}</Text>
-                <Text style={styles.meta}>
+              <View style={styles.categoryTextContainer}>
+                <Text style={styles.categoryTitle}>{category.name}</Text>
+                <Text style={styles.categoryMeta}>
                   {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} • 10 questions
                 </Text>
               </View>
+              <Text style={styles.categoryArrow}>›</Text>
             </View>
-          </TouchableOpacity>
+        </TouchableOpacity>
         ))}
       </ScrollView>
     </View>
@@ -222,34 +224,37 @@ function QuizScreen({ navigation, route }) {
   }
 
   if (showResult) {
+    const percentage = Math.round((score / questions.length) * 100);
+    const emoji = percentage >= 80 ? '🎉' : percentage >= 60 ? '👍' : percentage >= 40 ? '😊' : '📚';
+    const message = percentage >= 80 ? 'Excellent!' : percentage >= 60 ? 'Great Job!' : percentage >= 40 ? 'Good Effort!' : 'Keep Learning!';
+    
     return (
-      <View style={styles.flex1}>
-        <View style={styles.header}>
-          <Text style={styles.headerText}>Quiz Complete!</Text>
+      <View style={styles.resultContainer}>
+        <Text style={styles.resultEmoji}>{emoji}</Text>
+        <Text style={styles.resultTitle}>{message}</Text>
+        <Text style={styles.resultScore}>{score}/{questions.length}</Text>
+        <Text style={styles.resultPercentage}>{percentage}% Correct</Text>
+        
+        <View style={styles.resultStatsContainer}>
+          <View style={styles.resultStatRow}>
+            <Text style={styles.resultStatLabel}>Category</Text>
+            <Text style={styles.resultStatValue}>{categoryName}</Text>
+          </View>
+          <View style={styles.resultStatRow}>
+            <Text style={styles.resultStatLabel}>Difficulty</Text>
+            <Text style={styles.resultStatValue}>
+              {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+            </Text>
+          </View>
+          <View style={[styles.resultStatRow, styles.resultStatRowLast]}>
+            <Text style={styles.resultStatLabel}>Questions</Text>
+            <Text style={styles.resultStatValue}>{questions.length}</Text>
+          </View>
         </View>
-        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{ fontSize: 60, marginBottom: 20 }}>
-            {score >= 7 ? '🎉' : score >= 5 ? '👍' : '📚'}
-          </Text>
-          <Text style={[styles.largeHeadline, { textAlign: 'center' }]}>
-            Your Score: {score}/{questions.length}
-          </Text>
-          <Text style={[styles.meta, { textAlign: 'center', marginTop: 10 }]}>
-            {categoryName} • {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-          </Text>
-          <Text style={[styles.meta, { textAlign: 'center', marginTop: 5 }]}>
-            {score >= 7 ? 'Excellent!' : score >= 5 ? 'Good job!' : 'Keep learning!'}
-          </Text>
-          
+
+        <View style={styles.resultButtonsContainer}>
           <TouchableOpacity 
-            style={[styles.secondaryButton, { marginTop: 30, width: 200 }]}
-            onPress={() => navigation.navigate('MainHome')}
-          >
-            <Text style={styles.secondaryButtonText}>← HOME</Text>
-          </TouchableOpacity>
-  
-          <TouchableOpacity 
-            style={[styles.primaryButton, { marginTop: 15, width: 200 }]}
+            style={styles.primaryButton}
             onPress={() => {
               setCurrentQuestion(0);
               setScore(0);
@@ -260,7 +265,13 @@ function QuizScreen({ navigation, route }) {
           >
             <Text style={styles.primaryButtonText}>Try Again</Text>
           </TouchableOpacity>
-  
+
+          <TouchableOpacity 
+            style={styles.secondaryButton}
+            onPress={() => navigation.navigate('MainHome')}
+          >
+            <Text style={styles.secondaryButtonText}>← Back to Home</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -269,27 +280,25 @@ function QuizScreen({ navigation, route }) {
   const question = questions[currentQuestion];
 
   return (
-    <View style={styles.flex1}>
+    <View style={styles.quizContainer}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ position: 'absolute', left: 15 }}>
-          <Text style={{ fontSize: 16, color: '#fff', fontWeight: '600' }}>←BACK</Text>
+          <Text style={{ fontSize: 16, color: '#fff', fontWeight: '600' }}>← BACK</Text>
         </TouchableOpacity>
         <Text style={styles.headerText}>{categoryName}</Text>
       </View>
 
-      <ScrollView style={styles.container}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', margin: 15 }}>
-          <Text style={styles.meta}>
-            Question {currentQuestion + 1}/{questions.length} • {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+      <ScrollView style={{ flex: 1 }}>
+        <View style={styles.quizQuestionContainer}>
+          <Text style={styles.quizQuestionText}>
+            {question.question}
           </Text>
-          <Text style={styles.meta}>Score: {score}</Text>
+          <Text style={styles.quizProgress}>
+            Question {currentQuestion + 1} of {questions.length} • {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} • Score: {score}
+          </Text>
         </View>
 
-        <Text style={[styles.largeHeadline, { fontSize: 20 }]}>
-          {question.question}
-        </Text>
-
-        <View style={{ marginTop: 30 }}>
+        <View style={styles.quizOptionsContainer}>
           {question.answers.map((answer, index) => {
             const isSelected = selectedAnswer === answer;
             const isCorrect = answer === question.correct_answer;
@@ -300,21 +309,20 @@ function QuizScreen({ navigation, route }) {
               <TouchableOpacity
                 key={index}
                 style={[
-                  styles.homeCard,
-                  { 
-                    marginHorizontal: 15,
-                    marginBottom: 15,
-                    backgroundColor: showCorrect ? '#4ECDC4' : showIncorrect ? '#FF6B6B' : '#fff'
-                  }
+                  styles.optionButton,
+                  showCorrect && styles.optionButtonCorrect,
+                  showIncorrect && styles.optionButtonIncorrect,
+                  isSelected && !showCorrect && !showIncorrect && styles.optionButtonSelected
                 ]}
                 onPress={() => !selectedAnswer && handleAnswer(answer)}
                 disabled={selectedAnswer !== null}
+                activeOpacity={0.7}
               >
-                <View style={styles.cardContent}>
-                  <Text style={[styles.boldTitle, { color: (showCorrect || showIncorrect) ? '#fff' : '#000' }]}>
-                    {answer}
-                  </Text>
-                </View>
+                <Text style={[styles.optionText]}>
+                  {showCorrect && '✅ '}
+                  {showIncorrect && '❌ '}
+                  {answer}
+                </Text>
               </TouchableOpacity>
             );
           })}
