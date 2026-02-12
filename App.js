@@ -8,6 +8,7 @@ import { styles, colors } from './styles';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
+import { Accelerometer } from 'expo-sensors';
 
 const SettingsContext = createContext();
 
@@ -144,10 +145,104 @@ function QuizScreen({ navigation, route }) {
   const [showResult, setShowResult] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const [isShaking, setIsShaking] = useState(false);
+  const [shakeCount, setShakeCount] = useState(0);
+  const [shakeTimer, setShakeTimer] = useState(3);
+  const [disabledOptions, setDisabledOptions] = useState([]);
+  const [hintsRemaining, setHintsRemaining] = useState(3);
+
   useEffect(() => {
     fetchQuestions();
   }, []);
 
+    // シェイク検知
+    useEffect(() => {
+      let subscription;
+      let lastShake = 0;
+      
+      const startShakeDetection = async () => {
+        await Accelerometer.setUpdateInterval(100);
+        
+        subscription = Accelerometer.addListener(({ x, y, z }) => {
+          const acceleration = Math.sqrt(x * x + y * y + z * z);
+          const now = Date.now();
+          
+          if (acceleration > 2.5 && now - lastShake > 100) {
+            console.log('Shake detected! acceleration:', acceleration);
+            lastShake = now;
+            if (isShaking) {
+              console.log('Count increased:', shakeCount + 1);
+              setShakeCount(prev => prev + 1);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
+          }
+        });
+      };
+      
+      startShakeDetection();
+      
+      return () => {
+        subscription && subscription.remove();
+      };
+    }, [isShaking]);
+    
+    // シェイクタイマー
+    useEffect(() => {
+      if (isShaking && shakeTimer > 0) {
+        const timer = setTimeout(() => {
+          setShakeTimer(prev => prev - 1);
+        }, 1000);
+        return () => clearTimeout(timer);
+      } else if (isShaking && shakeTimer === 0) {
+        finishShake();
+      }
+    }, [isShaking, shakeTimer]);
+    
+    // シェイク開始
+    const startShake = () => {
+      console.log('startShake called');
+      console.log('hintsRemaining:', hintsRemaining);
+      console.log('selectedAnswer:', selectedAnswer);
+      console.log('disabledOptions:', disabledOptions);
+      if (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) return;
+      console.log('Shake started!');
+      setIsShaking(true);
+      setShakeCount(0);
+      setShakeTimer(3);
+      playSound('tap');
+    };
+    
+    // シェイク終了・選択肢削除
+    const finishShake = () => {
+      console.log('finishShake called, shakeCount:', shakeCount);
+      setIsShaking(false);
+      
+      if (shakeCount < 5) {
+        console.log('Shake failed - too few shakes');
+        playSound('incorrect');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } else {
+        console.log('Shake success!');
+        const question = questions[currentQuestion];
+        console.log('Current question:', question);
+        const incorrectAnswers = question.answers.filter(
+          answer => answer !== question.correct_answer
+        );
+        console.log('Incorrect answers:', incorrectAnswers);
+        
+        let toRemove = shakeCount >= 11 ? 2 : 1;
+        const removed = incorrectAnswers.slice(0, toRemove);
+        console.log('Removing options:', removed);
+        
+        setDisabledOptions(removed);
+        setHintsRemaining(prev => prev - 1);
+        playSound('correct');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      
+      setShakeCount(0);
+      setShakeTimer(3);
+    };
   // スコアを保存する関数（難易度も保存）
   const saveScore = async (finalScore, totalQuestions) => {
     try {
@@ -265,6 +360,7 @@ function QuizScreen({ navigation, route }) {
       if (currentQuestion < questions.length - 1) {
         setCurrentQuestion(currentQuestion + 1);
         setSelectedAnswer(null);
+        setDisabledOptions([]);
       } else {
         const finalScore = isCorrect ? newScore : score;
         saveScore(finalScore, questions.length);
@@ -362,12 +458,61 @@ function QuizScreen({ navigation, route }) {
           </Text>
         </View>
 
-        <View style={styles.quizOptionsContainer}>
+        {/* ヒント情報とシェイクボタン */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <Text style={{ fontSize: 14, color: colors.textLight }}>
+              💡 ヒント残り: {hintsRemaining}回
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.secondaryButton,
+                { paddingVertical: 8, paddingHorizontal: 16, minWidth: 100 },
+                (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) && { opacity: 0.5 }
+              ]}
+              onPress={(hintsRemaining > 0 && !selectedAnswer && disabledOptions.length === 0) ? startShake : undefined}
+            >
+              <Text style={styles.secondaryButtonText}>📱 シェイクする</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+
+        {/* シェイク中のオーバーレイ */}
+        {isShaking && (
+          <View style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}>
+            <Text style={{ fontSize: 48, marginBottom: 20 }}>📱</Text>
+            <Text style={{ fontSize: 32, fontWeight: '700', color: '#fff', marginBottom: 10 }}>
+              SHAKE IT!
+            </Text>
+            <Text style={{ fontSize: 48, fontWeight: '700', color: colors.primary, marginBottom: 20 }}>
+              {shakeCount}回
+            </Text>
+            <Text style={{ fontSize: 20, color: '#fff', marginBottom: 10 }}>
+              あと {shakeTimer}秒
+            </Text>
+            <Text style={{ fontSize: 16, color: colors.textLight }}>
+              {shakeCount < 5 ? '💪 もっと速く！' : shakeCount < 11 ? '👍 いい感じ！' : '🔥 すごい！'}
+            </Text>
+          </View>
+        )}
+
+{/* Options */}
+<View style={styles.quizOptionsContainer}>
           {question.answers.map((answer, index) => {
             const isSelected = selectedAnswer === answer;
             const isCorrect = answer === question.correct_answer;
             const showCorrect = selectedAnswer && isCorrect;
             const showIncorrect = isSelected && !isCorrect;
+            const isDisabled = disabledOptions.includes(answer);
+            const canPress = !selectedAnswer && !isDisabled;
 
             return (
               <TouchableOpacity
@@ -376,13 +521,16 @@ function QuizScreen({ navigation, route }) {
                   styles.optionButton,
                   showCorrect && styles.optionButtonCorrect,
                   showIncorrect && styles.optionButtonIncorrect,
-                  isSelected && !showCorrect && !showIncorrect && styles.optionButtonSelected
+                  isSelected && !showCorrect && !showIncorrect && styles.optionButtonSelected,
+                  isDisabled && { opacity: 0.3, backgroundColor: '#ccc' }
                 ]}
-                onPress={() => !selectedAnswer && handleAnswer(answer)}
-                disabled={selectedAnswer !== null}
+                onPress={canPress ? () => handleAnswer(answer) : undefined}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.optionText]}>
+                <Text style={[
+                  styles.optionText,
+                  isDisabled && { textDecorationLine: 'line-through', color: '#999' }
+                ]}>
                   {showCorrect && '✅ '}
                   {showIncorrect && '❌ '}
                   {answer}
