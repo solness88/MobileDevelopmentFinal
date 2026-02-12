@@ -7,6 +7,7 @@ import { LineChart } from 'react-native-chart-kit';
 import { styles, colors } from './styles';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 
 const SettingsContext = createContext();
 
@@ -77,6 +78,7 @@ function HomeScreen({ navigation }) {
             ]}
             onPress={() => {
               playSound('tap');
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setSelectedDifficulty(difficulty.value);
             }}
             activeOpacity={0.7}
@@ -100,6 +102,7 @@ function HomeScreen({ navigation }) {
             style={styles.categoryCardEnhanced}
             onPress={() => {
               playSound('tap');
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               navigation.navigate('Quiz', { 
                 categoryId: category.id,
                 categoryName: category.name,
@@ -228,11 +231,29 @@ function QuizScreen({ navigation, route }) {
       .replace(/&nbsp;/g, ' ');
   };
 
-  const handleAnswer = (answer) => {
+  const handleAnswer = async (answer) => {
     setSelectedAnswer(answer);
     
     const isCorrect = answer === questions[currentQuestion].correct_answer;
     playSound(isCorrect ? 'correct' : 'incorrect');
+    
+    if (isCorrect) {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    } else {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     
     const newScore = isCorrect ? score + 1 : score;
     
