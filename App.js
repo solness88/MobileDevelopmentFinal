@@ -6,9 +6,41 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions
 import { LineChart } from 'react-native-chart-kit';
 import { styles, colors } from './styles';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
 
 const SettingsContext = createContext();
 
+// Sound utility
+const soundObjects = {};
+
+const loadSounds = async () => {
+  try {
+    const sounds = {
+      correct: require('./assets/sounds/correct.mp3'),
+      incorrect: require('./assets/sounds/incorrect.mp3'),
+      tap: require('./assets/sounds/tap.mp3'),
+      complete: require('./assets/sounds/complete.mp3'),
+    };
+
+    for (const [key, source] of Object.entries(sounds)) {
+      const { sound } = await Audio.Sound.createAsync(source);
+      soundObjects[key] = sound;
+    }
+  } catch (error) {
+    console.log('Error loading sounds:', error);
+  }
+};
+
+const playSound = async (soundName) => {
+  try {
+    const sound = soundObjects[soundName];
+    if (sound) {
+      await sound.replayAsync();
+    }
+  } catch (error) {
+    console.log('Error playing sound:', error);
+  }
+};
 // --- 1. Home Screen (Select category) ---
 function HomeScreen({ navigation }) {
   const [selectedDifficulty, setSelectedDifficulty] = useState('medium'); // Default defficulty is medium
@@ -41,12 +73,12 @@ function HomeScreen({ navigation }) {
             key={difficulty.value}
             style={[
               styles.difficultyChip,
-              selectedDifficulty === difficulty.value && { 
-                backgroundColor: '#007AFF', 
-                borderColor: '#007AFF' 
-              }
+              selectedDifficulty === difficulty.value && styles.difficultyChipSelected
             ]}
-            onPress={() => setSelectedDifficulty(difficulty.value)}
+            onPress={() => {
+              playSound('tap');
+              setSelectedDifficulty(difficulty.value);
+            }}
             activeOpacity={0.7}
           >
             <Text style={[
@@ -63,16 +95,19 @@ function HomeScreen({ navigation }) {
         <Text style={styles.sectionLabel}>Choose a Category</Text>
         
         {categories.map((category) => (
-        <TouchableOpacity 
-          key={category.id}
-          style={styles.categoryCardEnhanced}
-          onPress={() => navigation.navigate('Quiz', { 
-            categoryId: category.id,
-            categoryName: category.name,
-            difficulty: selectedDifficulty
-          })}
-          activeOpacity={0.7}
-        >
+          <TouchableOpacity 
+            key={category.id}
+            style={styles.categoryCardEnhanced}
+            onPress={() => {
+              playSound('tap');
+              navigation.navigate('Quiz', { 
+                categoryId: category.id,
+                categoryName: category.name,
+                difficulty: selectedDifficulty
+              });
+            }}
+            activeOpacity={0.7}
+          >
             <View style={[styles.categoryAccentBar, { backgroundColor: category.color }]} />
             <View style={styles.categoryCardBody}>
               <View style={[
@@ -196,9 +231,12 @@ function QuizScreen({ navigation, route }) {
   const handleAnswer = (answer) => {
     setSelectedAnswer(answer);
     
-    const newScore = answer === questions[currentQuestion].correct_answer ? score + 1 : score;
+    const isCorrect = answer === questions[currentQuestion].correct_answer;
+    playSound(isCorrect ? 'correct' : 'incorrect');
     
-    if (answer === questions[currentQuestion].correct_answer) {
+    const newScore = isCorrect ? score + 1 : score;
+    
+    if (isCorrect) {
       setScore(newScore);
     }
     
@@ -207,8 +245,9 @@ function QuizScreen({ navigation, route }) {
         setCurrentQuestion(currentQuestion + 1);
         setSelectedAnswer(null);
       } else {
-        const finalScore = answer === questions[currentQuestion].correct_answer ? newScore : score;
+        const finalScore = isCorrect ? newScore : score;
         saveScore(finalScore, questions.length);
+        playSound('complete');
         setShowResult(true);
       }
     }, 1000);
@@ -256,6 +295,7 @@ function QuizScreen({ navigation, route }) {
           <TouchableOpacity 
             style={styles.primaryButton}
             onPress={() => {
+              playSound('tap');
               setCurrentQuestion(0);
               setScore(0);
               setSelectedAnswer(null);
@@ -268,7 +308,10 @@ function QuizScreen({ navigation, route }) {
 
           <TouchableOpacity 
             style={styles.secondaryButton}
-            onPress={() => navigation.navigate('MainHome')}
+            onPress={() => {
+              playSound('tap');
+              navigation.navigate('MainHome');
+            }}
           >
             <Text style={styles.secondaryButtonText}>← Back to Home</Text>
           </TouchableOpacity>
@@ -607,6 +650,10 @@ function HomeStack() {
 
 export default function App() {
   const [textSize, setTextSize] = useState(18);
+
+  useEffect(() => {
+    loadSounds();
+  }, []);
 
   return (
     <SettingsContext.Provider value={{ textSize, setTextSize }}>
