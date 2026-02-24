@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState, useContext } from 'react';
+import React, { createContext, useEffect, useState, useContext, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -44,6 +44,7 @@ const playSound = async (soundName) => {
     console.log('Error playing sound:', error);
   }
 };
+
 // --- 1. Home Screen (Select category) ---
 function HomeScreen({ navigation }) {
   const [selectedDifficulty, setSelectedDifficulty] = useState('medium'); // Default defficulty is medium
@@ -176,6 +177,15 @@ function QuizScreen({ navigation, route }) {
   const [disabledOptions, setDisabledOptions] = useState([]);
   const [hintsRemaining, setHintsRemaining] = useState(3);
 
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [swipeCount, setSwipeCount] = useState(0);
+  const [swipeTimer, setSwipeTimer] = useState(3);
+
+  const lastSwipeTime = useRef(0);
+  const swipeStartY = useRef(0);
+  const lastY = useRef(0);
+  const lastX = useRef(0);
+
   useEffect(() => {
     fetchQuestions();
   }, []);
@@ -223,6 +233,31 @@ function QuizScreen({ navigation, route }) {
       }
     }, [isShaking, shakeTimer]);
     
+
+
+
+
+  // Swipe timer
+  useEffect(() => {
+    if (isSwiping && swipeTimer > 0) {
+      const timer = setTimeout(() => {
+        setSwipeTimer(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (isSwiping && swipeTimer === 0) {
+      finishSwipe();
+    }
+  }, [isSwiping, swipeTimer]);
+
+
+
+
+
+
+
+
+
+
     // シェイク開始
     const startShake = () => {
       console.log('startShake called');
@@ -264,10 +299,87 @@ function QuizScreen({ navigation, route }) {
         playSound('correct');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      
+
       setShakeCount(0);
       setShakeTimer(3);
     };
+
+
+
+
+
+    // スワイプ開始
+    const startSwipe = () => {
+      if (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) return;
+
+      setIsSwiping(true);
+      setSwipeCount(0);
+      setSwipeTimer(3);
+      playSound('tap');
+    };
+
+    // スワイプ開始
+    const handleSwipeStart = (e) => {
+      swipeStartY.current = e.nativeEvent.pageY;
+      lastY.current = e.nativeEvent.pageY;
+      lastX.current = e.nativeEvent.pageX;
+    };
+
+    // スワイプ中
+    const handleSwipeMove = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const currentY = e.nativeEvent.pageY;
+      const currentX = e.nativeEvent.pageX;
+      const distanceY = Math.abs(currentY - lastY.current);
+      const distanceX = Math.abs(currentX - lastX.current);
+      const totalDistance = Math.max(distanceY, distanceX);
+
+      if (totalDistance > 130) {
+        lastY.current = currentY;
+        lastX.current = currentX;
+        setSwipeCount(prev => prev + 1);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    };
+
+
+
+
+
+    // スワイプ終了
+    const finishSwipe = () => {
+      setIsSwiping(false);
+      
+      if (swipeCount < 10) {
+        playSound('incorrect');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } else {
+        const question = questions[currentQuestion];
+        const incorrectAnswers = question.answers.filter(
+          answer => answer !== question.correct_answer
+        );
+        
+        let toRemove = swipeCount >= 20 ? 2 : 1;
+        const removed = incorrectAnswers.slice(0, toRemove);
+        
+        setDisabledOptions(removed);
+        setHintsRemaining(prev => prev - 1);
+        playSound('correct');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      
+      setSwipeCount(0);
+      setSwipeTimer(3);
+    };
+
+
+
+
+
+
+
   // スコアを保存する関数（難易度も保存）
   const saveScore = async (finalScore, totalQuestions) => {
     try {
@@ -478,7 +590,7 @@ function QuizScreen({ navigation, route }) {
         <Text style={styles.headerText}>{categoryName}</Text>
       </View>
 
-      <ScrollView style={{ flex: 1 }}>
+      <ScrollView style={{ flex: 1 }} scrollEnabled={!isSwiping}>
         <View style={styles.quizQuestionContainer}>
           <Text style={styles.quizQuestionText}>
             {question.question}
@@ -488,25 +600,36 @@ function QuizScreen({ navigation, route }) {
           </Text>
         </View>
 
-        {/* ヒント情報とシェイクボタン */}
+        {/* Hint Selection UI */}
         <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <Text style={{ fontSize: 14, color: colors.textLight }}>
-              💡 ヒント残り: {hintsRemaining}回
-            </Text>
+          <Text style={{ fontSize: 14, color: colors.textLight, marginBottom: 10 }}>
+            💡 Hints remaining: {hintsRemaining}
+          </Text>
+          
+          <View style={{ flexDirection: 'row', gap: 10 }}>
             <TouchableOpacity
               style={[
                 styles.secondaryButton,
-                { paddingVertical: 8, paddingHorizontal: 16, minWidth: 100 },
+                { flex: 1, paddingVertical: 8 },
                 (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) && { opacity: 0.5 }
               ]}
               onPress={(hintsRemaining > 0 && !selectedAnswer && disabledOptions.length === 0) ? startShake : undefined}
             >
-              <Text style={styles.secondaryButtonText}>📱 シェイクする</Text>
+              <Text style={[styles.secondaryButtonText, { fontSize: 12 }]}>📱 Shake</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.secondaryButton,
+                { flex: 1, paddingVertical: 8 },
+                (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) && { opacity: 0.5 }
+              ]}
+              onPress={(hintsRemaining > 0 && !selectedAnswer && disabledOptions.length === 0) ? startSwipe : undefined}
+            >
+              <Text style={[styles.secondaryButtonText, { fontSize: 12 }]}>👆 Swipe</Text>
             </TouchableOpacity>
           </View>
         </View>
-
 
         {/* シェイク中のオーバーレイ */}
         {isShaking && (
@@ -534,8 +657,43 @@ function QuizScreen({ navigation, route }) {
           </View>
         )}
 
-{/* Options */}
-<View style={styles.quizOptionsContainer}>
+        {/* スワイプ中のオーバーレイ */}
+        {isSwiping && (
+          <View style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}
+
+          // onTouchMove={handleSwipe}
+          onTouchStart={handleSwipeStart}
+          onTouchMove={handleSwipeMove}
+          pointerEvents="box-only"
+          >
+            <Text style={{ fontSize: 48, marginBottom: 20 }}>👆</Text>
+            <Text style={{ fontSize: 32, fontWeight: '700', color: '#fff', marginBottom: 10 }}>
+              SWIPE IT!
+            </Text>
+            <Text style={{ fontSize: 48, fontWeight: '700', color: colors.primary, marginBottom: 20 }}>
+              {swipeCount} times
+            </Text>
+            <Text style={{ fontSize: 20, color: '#fff', marginBottom: 10 }}>
+              {swipeTimer} seconds left
+            </Text>
+            <Text style={{ fontSize: 16, color: colors.textLight }}>
+              {swipeCount < 10 ? '💪 Faster!' : swipeCount < 20 ? '👍 Good!' : '🔥 Amazing!'}
+            </Text>
+          </View>
+        )}
+
+
+
+
+        {/* Options */}
+        <View style={styles.quizOptionsContainer}>
           {question.answers.map((answer, index) => {
             const isSelected = selectedAnswer === answer;
             const isCorrect = answer === question.correct_answer;
