@@ -181,10 +181,19 @@ function QuizScreen({ navigation, route }) {
   const [swipeCount, setSwipeCount] = useState(0);
   const [swipeTimer, setSwipeTimer] = useState(3);
 
+  // マイク用state
+  const [isShouting, setIsShouting] = useState(false);
+  const [volumeLevel, setVolumeLevel] = useState(0);
+  const [shoutTimer, setShoutTimer] = useState(10);
+  const [loudDuration, setLoudDuration] = useState(0);
+
   const lastSwipeTime = useRef(0);
   const swipeStartY = useRef(0);
   const lastY = useRef(0);
   const lastX = useRef(0);
+
+  const recording = useRef(null);
+  const lastVolumeCheckTime = useRef(0);
 
   useEffect(() => {
     fetchQuestions();
@@ -251,12 +260,17 @@ function QuizScreen({ navigation, route }) {
 
 
 
-
-
-
-
-
-
+  // マイクタイマー
+  useEffect(() => {
+    if (isShouting && shoutTimer > 0) {
+      const timer = setTimeout(() => {
+        setShoutTimer(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (isShouting && shoutTimer === 0) {
+      finishShout();
+    }
+  }, [isShouting, shoutTimer]);
 
     // シェイク開始
     const startShake = () => {
@@ -347,11 +361,92 @@ function QuizScreen({ navigation, route }) {
 
 
 
+    // マイク開始
+    const startShout = async () => {
+      if (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) return;
+
+      try {
+        await Audio.requestPermissionsAsync();
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true
+        });
+
+        const { recording: newRecording } = await Audio.Recording.createAsync(
+          Audio.RecordingOptionsPresets.HIGH_QUALITY,
+          (status) => {
+            if (status.isRecording && status.metering) {
+              const db = status.metering;
+              const volume = Math.max(0, db + 160);
+              setVolumeLevel(volume);
+
+              // 持続時間カウント
+              const now = Date.now();
+              if (volume >= 60 && lastVolumeCheckTime.current > 0) {
+                const elapsed = (now - lastVolumeCheckTime.current) / 1000;
+                setLoudDuration(prev => prev + elapsed);
+              }
+              lastVolumeCheckTime.current = now;
+            }
+          },
+          100
+        );
+
+        recording.current = newRecording;
+        setIsShouting(true);
+        setVolumeLevel(0);
+        setLoudDuration(0);
+        setShoutTimer(10);
+        lastVolumeCheckTime.current = Date.now();
+        playSound('tap');
+      } catch (err) {
+        console.error('Failed tostart recording', err);
+        alert('Microphone permission required');
+      }
+    };
+
+    // マイク終了
+    const finishShout = async () => {
+      setIsShouting(false);
+
+      try {
+        if (recording.current) {
+          await recording.current.stopAndUnloadAsync();
+          recording.current = null;
+        }
+      } catch (err) {
+        console.error('Failed to stop recording', err);
+      }
+
+      console.log('Loud duration:', loudDuration);
+
+      if (loudDuration < 5) {
+        playSound('incorrect');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } else {
+        const question = questions[currentQuestion];
+        const incorrectAnswers = question.answers.filter(
+          answer => answer !== question.correct_answer
+        );
+
+        let toRemove = loudDuration >= 10 ? 2 : 1;
+        const removed = incorrectAnswers.slice(0, toRemove);
+
+        setDisabledOptions(removed);
+        setHintsRemaining(prev => prev - 1);
+        playSound('correct');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      setVolumeLevel(0);
+      setLoudDuration(0);
+      setShoutTimer(10);
+      lastVolumeCheckTime.current = 0;
+    };
 
     // スワイプ終了
     const finishSwipe = () => {
       setIsSwiping(false);
-      
+
       if (swipeCount < 10) {
         playSound('incorrect');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -360,40 +455,34 @@ function QuizScreen({ navigation, route }) {
         const incorrectAnswers = question.answers.filter(
           answer => answer !== question.correct_answer
         );
-        
+
         let toRemove = swipeCount >= 20 ? 2 : 1;
         const removed = incorrectAnswers.slice(0, toRemove);
-        
+
         setDisabledOptions(removed);
         setHintsRemaining(prev => prev - 1);
         playSound('correct');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      
+
       setSwipeCount(0);
       setSwipeTimer(3);
     };
 
-
-
-
-
-
-
-  // スコアを保存する関数（難易度も保存）
-  const saveScore = async (finalScore, totalQuestions) => {
-    try {
-      const quizResult = {
-        id: Date.now().toString(),
-        category: categoryName,
-        categoryId: categoryId,
-        difficulty: difficulty, // 難易度を追加
-        score: finalScore,
-        total: totalQuestions,
-        percentage: Math.round((finalScore / totalQuestions) * 100),
-        date: new Date().toISOString(),
-        timestamp: Date.now()
-      };
+    // スコアを保存する関数（難易度も保存）
+    const saveScore = async (finalScore, totalQuestions) => {
+      try {
+        const quizResult = {
+          id: Date.now().toString(),
+          category: categoryName,
+          categoryId: categoryId,
+          difficulty: difficulty, // 難易度を追加
+          score: finalScore,
+          total: totalQuestions,
+          percentage: Math.round((finalScore / totalQuestions) * 100),
+          date: new Date().toISOString(),
+          timestamp: Date.now()
+        };
 
       const existingHistory = await AsyncStorage.getItem('quizHistory');
       const history = existingHistory ? JSON.parse(existingHistory) : [];
@@ -407,10 +496,10 @@ function QuizScreen({ navigation, route }) {
       await AsyncStorage.setItem('quizHistory', JSON.stringify(history));
       console.log('Score saved successfully:', quizResult);
 
-    } catch (error) {
-      console.error('Error saving score:', error);
-    }
-  };
+      } catch (error) {
+        console.error('Error saving score:', error);
+      }
+    };
 
   const fetchQuestions = async () => {
     setLoading(true);
@@ -605,7 +694,7 @@ function QuizScreen({ navigation, route }) {
           <Text style={{ fontSize: 14, color: colors.textLight, marginBottom: 10 }}>
             💡 Hints remaining: {hintsRemaining}
           </Text>
-          
+
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <TouchableOpacity
               style={[
@@ -617,7 +706,7 @@ function QuizScreen({ navigation, route }) {
             >
               <Text style={[styles.secondaryButtonText, { fontSize: 12 }]}>📱 Shake</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[
                 styles.secondaryButton,
@@ -627,6 +716,17 @@ function QuizScreen({ navigation, route }) {
               onPress={(hintsRemaining > 0 && !selectedAnswer && disabledOptions.length === 0) ? startSwipe : undefined}
             >
               <Text style={[styles.secondaryButtonText, { fontSize: 12 }]}>👆 Swipe</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.secondaryButton,
+                { flex: 1, paddingVertical: 8 },
+                (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) && { opacity: 0.5 }
+              ]}
+              onPress={(hintsRemaining > 0 && !selectedAnswer && disabledOptions.length === 0) ? startShout : undefined}
+            >
+              <Text style={[styles.secondaryButtonText, { fontSize: 12 }]}>🎤 Shout</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -660,18 +760,18 @@ function QuizScreen({ navigation, route }) {
         {/* スワイプ中のオーバーレイ */}
         {isSwiping && (
           <View style={{
-            position: 'absolute',
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1000
-          }}
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.8)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1000
+              }}
 
-          // onTouchMove={handleSwipe}
-          onTouchStart={handleSwipeStart}
-          onTouchMove={handleSwipeMove}
-          pointerEvents="box-only"
+            // onTouchMove={handleSwipe}
+            onTouchStart={handleSwipeStart}
+            onTouchMove={handleSwipeMove}
+            pointerEvents="box-only"
           >
             <Text style={{ fontSize: 48, marginBottom: 20 }}>👆</Text>
             <Text style={{ fontSize: 32, fontWeight: '700', color: '#fff', marginBottom: 10 }}>
@@ -688,6 +788,35 @@ function QuizScreen({ navigation, route }) {
             </Text>
           </View>
         )}
+
+
+
+
+        {isShouting && (
+          <View style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}>
+            <Text style={{ fontSize: 48, marginBottom: 20 }}>🎤</Text>
+            <Text style={{ fontSize: 32, fontWeight: '700', color: '#fff', marginBottom: 10 }}>
+              SHOUT IT!
+            </Text>
+            <Text style={{ fontSize: 48, fontWeight: '700', color: colors.primary, marginBottom: 20 }}>
+              {loudDuration.toFixed(1)}s
+            </Text>
+            <Text style={{ fontSize: 20, color: '#fff', marginBottom: 10 }}>
+              {shoutTimer} seconds left
+            </Text>
+            <Text style={{ fontSize: 16, color: colors.textLight }}>
+              {loudDuration < 5 ? '📢 Keep shouting!' : loudDuration < 10 ? '👍 Good! Keep going!' : '🔥 Amazing!'} ⇠⇠⇠ 追加
+            </Text>
+          </View>
+        )}
+
 
 
 
