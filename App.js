@@ -1,3 +1,18 @@
+/**
+ * Daily Quiz Application
+ * 
+ * A React Native quiz app with multiple categories, difficulty levels,
+ * and innovative physical interaction hint systems (shake, swipe, voice).
+ * 
+ * - Quiz system with OpenTriviaDB API integration
+ * - Score tracking with AsyncStorage
+ * - Statistics and history visualization
+ * - Three physical hint methods: shake, swipe, microphone
+ * - Sound effects and haptic feedback
+ * - Network connectivity detection
+ * 
+**/
+
 import React, { createContext, useEffect, useState, useContext, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -13,9 +28,20 @@ import NetInfo from '@react-native-community/netinfo';
 
 const SettingsContext = createContext();
 
-// Sound utility
+// ========================================
+// Sound Management
+// ========================================
+
+/**
+ * Sound object storage for audio playback
+ * Stores preloaded sound files for quick access
+ */
 const soundObjects = {};
 
+/**
+ * Load all sound effects on app initialization
+ * Preloads correct, incorrect, tap, and complete sounds
+ */
 const loadSounds = async () => {
   try {
     const sounds = {
@@ -34,6 +60,10 @@ const loadSounds = async () => {
   }
 };
 
+/**
+ * Play a sound effect by name
+ * Name of the sound to play (correct, incorrect, tap, complete)
+ */
 const playSound = async (soundName) => {
   try {
     const sound = soundObjects[soundName];
@@ -45,11 +75,22 @@ const playSound = async (soundName) => {
   }
 };
 
-// --- 1. Home Screen (Select category) ---
+// =====================================
+// Screen Components
+// ========================================
+/**
+ * HomeScreen - Main category selection screen
+ * Displays quiz categories with difficulty selection.
+ * Checks network connectivity before allowing quiz start.
+ */
 function HomeScreen({ navigation }) {
   const [selectedDifficulty, setSelectedDifficulty] = useState('medium'); // Default defficulty is medium
   const [isConnected, setIsConnected] = useState(true);
 
+   /**
+   * Monitor network connectivity status
+   * Updates UI to prevent quiz start when offline
+   */
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       setIsConnected(state.isConnected);
@@ -57,6 +98,10 @@ function HomeScreen({ navigation }) {
     return () => unsubscribe();
   }, []);
 
+   /**
+   * Quiz categories with icons and colors
+   * Each category maps to OpenTriviaDB category IDs
+   */
   const categories = [
     { id: 9, name: 'General Knowledge', icon: '🎯', color: colors.categories.general },
     { id: 17, name: 'Science & Nature', icon: '🔬', color: colors.categories.science },
@@ -66,6 +111,9 @@ function HomeScreen({ navigation }) {
     { id: 22, name: 'Geography', icon: '🌍', color: colors.categories.geography }
   ];
 
+  /**
+   * Available difficulty levels for quiz selection
+   */
   const difficulties = [
     { value: 'easy', label: 'Easy', emoji: '😊' },
     { value: 'medium', label: 'Medium', emoji: '🤔' },
@@ -86,7 +134,7 @@ function HomeScreen({ navigation }) {
         </View>
       )}
 
-      {/* 難易度選択 */}
+      {/* Difficulty selection */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
         {difficulties.map(difficulty => (
           <TouchableOpacity
@@ -161,9 +209,17 @@ function HomeScreen({ navigation }) {
   );
 }
 
-// --- 2. Quiz Screen ---
+/**
+ * QuizScreen - Main quiz gameplay screen
+ * 
+ * Handles quiz questions, answer selection, scoring, and hint systems.
+ * Features three physical interaction methods for hints:
+ * - Shake: Accelerometer-based gesture
+ * - Swipe: Touch screen rapid swiping
+ * - Shout: Microphone volume detection
+ */
 function QuizScreen({ navigation, route }) {
-  const { categoryId, categoryName, difficulty } = route.params; // difficultyを追加
+  const { categoryId, categoryName, difficulty } = route.params;
   const [questions, setQuestions] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [score, setScore] = useState(0);
@@ -199,54 +255,58 @@ function QuizScreen({ navigation, route }) {
     fetchQuestions();
   }, []);
 
-    // シェイク検知
-    useEffect(() => {
-      let subscription;
-      let lastShake = 0;
-      
-      const startShakeDetection = async () => {
-        await Accelerometer.setUpdateInterval(100);
-        
-        subscription = Accelerometer.addListener(({ x, y, z }) => {
-          const acceleration = Math.sqrt(x * x + y * y + z * z);
-          const now = Date.now();
-          
-          if (acceleration > 2.5 && now - lastShake > 100) {
-            console.log('Shake detected! acceleration:', acceleration);
-            lastShake = now;
-            if (isShaking) {
-              console.log('Count increased:', shakeCount + 1);
-              setShakeCount(prev => prev + 1);
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }
+  // =================================
+  // Shake Hint System (Accelerometer)
+  // ===================================
+
+  /** Monitor shake gestures */
+  useEffect(() => {
+    let subscription;
+    let lastShake = 0;
+
+    const startShakeDetection = async () => {
+      await Accelerometer.setUpdateInterval(100);
+
+      subscription = Accelerometer.addListener(({ x, y, z }) => {
+        const acceleration = Math.sqrt(x * x + y * y + z * z);
+        const now = Date.now();
+
+        if (acceleration > 2.5 && now - lastShake > 100) {
+          console.log('Shake detected! acceleration:', acceleration);
+          lastShake = now;
+          if (isShaking) {
+            console.log('Count increased:', shakeCount + 1);
+            setShakeCount(prev => prev + 1);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           }
-        });
-      };
-      
-      startShakeDetection();
-      
-      return () => {
-        subscription && subscription.remove();
-      };
-    }, [isShaking]);
-    
-    // シェイクタイマー
-    useEffect(() => {
-      if (isShaking && shakeTimer > 0) {
-        const timer = setTimeout(() => {
-          setShakeTimer(prev => prev - 1);
-        }, 1000);
-        return () => clearTimeout(timer);
-      } else if (isShaking && shakeTimer === 0) {
-        finishShake();
-      }
-    }, [isShaking, shakeTimer]);
-    
+        }
+      });
+    };
 
+    startShakeDetection();
 
+    return () => {
+      subscription && subscription.remove();
+    };
+  }, [isShaking]);
 
+  /** Shake countdown timer */
+  useEffect(() => {
+    if (isShaking && shakeTimer > 0) {
+      const timer = setTimeout(() => {
+        setShakeTimer(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (isShaking && shakeTimer === 0) {
+      finishShake();
+    }
+  }, [isShaking, shakeTimer]);
 
-  // Swipe timer
+  // ========================================
+  // Swipe Hint System (Touch Screen)
+  // ========================================
+
+  /** Swipe countdown timer */
   useEffect(() => {
     if (isSwiping && swipeTimer > 0) {
       const timer = setTimeout(() => {
@@ -258,9 +318,7 @@ function QuizScreen({ navigation, route }) {
     }
   }, [isSwiping, swipeTimer]);
 
-
-
-  // マイクタイマー
+  /** Microphone countdown timer */
   useEffect(() => {
     if (isShouting && shoutTimer > 0) {
       const timer = setTimeout(() => {
@@ -272,217 +330,216 @@ function QuizScreen({ navigation, route }) {
     }
   }, [isShouting, shoutTimer]);
 
-    // シェイク開始
-    const startShake = () => {
-      console.log('startShake called');
-      console.log('hintsRemaining:', hintsRemaining);
-      console.log('selectedAnswer:', selectedAnswer);
-      console.log('disabledOptions:', disabledOptions);
-      if (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) return;
-      console.log('Shake started!');
-      setIsShaking(true);
-      setShakeCount(0);
-      setShakeTimer(3);
-      playSound('tap');
-    };
+  /** Start shake challenge */
+  const startShake = () => {
+    console.log('startShake called');
+    console.log('hintsRemaining:', hintsRemaining);
+    console.log('selectedAnswer:', selectedAnswer);
+    console.log('disabledOptions:', disabledOptions);
+    if (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) return;
+    console.log('Shake started!');
+    setIsShaking(true);
+    setShakeCount(0);
+    setShakeTimer(3);
+    playSound('tap');
+  };
     
-    // シェイク終了・選択肢削除
-    const finishShake = () => {
-      console.log('finishShake called, shakeCount:', shakeCount);
-      setIsShaking(false);
+  /** Evaluate shake result and remove options */
+  const finishShake = () => {
+    console.log('finishShake called, shakeCount:', shakeCount);
+    setIsShaking(false);
+    
+    if (shakeCount < 5) {
+      console.log('Shake failed - too few shakes');
+      playSound('incorrect');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } else {
+      console.log('Shake success!');
+      const question = questions[currentQuestion];
+      console.log('Current question:', question);
+      const incorrectAnswers = question.answers.filter(
+        answer => answer !== question.correct_answer
+      );
+      console.log('Incorrect answers:', incorrectAnswers);
       
-      if (shakeCount < 5) {
-        console.log('Shake failed - too few shakes');
-        playSound('incorrect');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      } else {
-        console.log('Shake success!');
-        const question = questions[currentQuestion];
-        console.log('Current question:', question);
-        const incorrectAnswers = question.answers.filter(
-          answer => answer !== question.correct_answer
-        );
-        console.log('Incorrect answers:', incorrectAnswers);
-        
-        let toRemove = shakeCount >= 11 ? 2 : 1;
-        const removed = incorrectAnswers.slice(0, toRemove);
-        console.log('Removing options:', removed);
-        
-        setDisabledOptions(removed);
-        setHintsRemaining(prev => prev - 1);
-        playSound('correct');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
+      let toRemove = shakeCount >= 11 ? 2 : 1;
+      const removed = incorrectAnswers.slice(0, toRemove);
+      console.log('Removing options:', removed);
+      
+      setDisabledOptions(removed);
+      setHintsRemaining(prev => prev - 1);
+      playSound('correct');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
 
-      setShakeCount(0);
-      setShakeTimer(3);
-    };
+    setShakeCount(0);
+    setShakeTimer(3);
+  };
 
+  /** Start swipe challenge */
+  const startSwipe = () => {
+    if (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) return;
 
+    setIsSwiping(true);
+    setSwipeCount(0);
+    setSwipeTimer(3);
+    playSound('tap');
+  };
 
+  /** Record swipe start position */
+  const handleSwipeStart = (e) => {
+    swipeStartY.current = e.nativeEvent.pageY;
+    lastY.current = e.nativeEvent.pageY;
+    lastX.current = e.nativeEvent.pageX;
+  };
 
+  /** Track swipe distance and count */
+  const handleSwipeMove = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-    // スワイプ開始
-    const startSwipe = () => {
-      if (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) return;
+    const currentY = e.nativeEvent.pageY;
+    const currentX = e.nativeEvent.pageX;
+    const distanceY = Math.abs(currentY - lastY.current);
+    const distanceX = Math.abs(currentX - lastX.current);
+    const totalDistance = Math.max(distanceY, distanceX);
 
-      setIsSwiping(true);
-      setSwipeCount(0);
-      setSwipeTimer(3);
-      playSound('tap');
-    };
+    if (totalDistance > 130) {
+      lastY.current = currentY;
+      lastX.current = currentX;
+      setSwipeCount(prev => prev + 1);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
 
-    // スワイプ開始
-    const handleSwipeStart = (e) => {
-      swipeStartY.current = e.nativeEvent.pageY;
-      lastY.current = e.nativeEvent.pageY;
-      lastX.current = e.nativeEvent.pageX;
-    };
+  /** Start microphone recording and volume monitoring */
+  const startShout = async () => {
+    if (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) return;
 
-    // スワイプ中
-    const handleSwipeMove = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+    try {
+      await Audio.requestPermissionsAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true
+      });
 
-      const currentY = e.nativeEvent.pageY;
-      const currentX = e.nativeEvent.pageX;
-      const distanceY = Math.abs(currentY - lastY.current);
-      const distanceX = Math.abs(currentX - lastX.current);
-      const totalDistance = Math.max(distanceY, distanceX);
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        (status) => {
+          if (status.isRecording && status.metering) {
+            const db = status.metering;
+            const volume = Math.max(0, db + 160);
+            setVolumeLevel(volume);
 
-      if (totalDistance > 130) {
-        lastY.current = currentY;
-        lastX.current = currentX;
-        setSwipeCount(prev => prev + 1);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    };
-
-
-
-
-    // マイク開始
-    const startShout = async () => {
-      if (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) return;
-
-      try {
-        await Audio.requestPermissionsAsync();
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true
-        });
-
-        const { recording: newRecording } = await Audio.Recording.createAsync(
-          Audio.RecordingOptionsPresets.HIGH_QUALITY,
-          (status) => {
-            if (status.isRecording && status.metering) {
-              const db = status.metering;
-              const volume = Math.max(0, db + 160);
-              setVolumeLevel(volume);
-
-              // 持続時間カウント
-              const now = Date.now();
-              if (volume >= 60 && lastVolumeCheckTime.current > 0) {
-                const elapsed = (now - lastVolumeCheckTime.current) / 1000;
-                setLoudDuration(prev => prev + elapsed);
-              }
-              lastVolumeCheckTime.current = now;
+            // 持続時間カウント
+            const now = Date.now();
+            if (volume >= 60 && lastVolumeCheckTime.current > 0) {
+              const elapsed = (now - lastVolumeCheckTime.current) / 1000;
+              setLoudDuration(prev => prev + elapsed);
             }
-          },
-          100
-        );
+            lastVolumeCheckTime.current = now;
+          }
+        },
+        100
+      );
 
-        recording.current = newRecording;
-        setIsShouting(true);
-        setVolumeLevel(0);
-        setLoudDuration(0);
-        setShoutTimer(10);
-        lastVolumeCheckTime.current = Date.now();
-        playSound('tap');
-      } catch (err) {
-        console.error('Failed tostart recording', err);
-        alert('Microphone permission required');
-      }
-    };
-
-    // マイク終了
-    const finishShout = async () => {
-      setIsShouting(false);
-
-      try {
-        if (recording.current) {
-          await recording.current.stopAndUnloadAsync();
-          recording.current = null;
-        }
-      } catch (err) {
-        console.error('Failed to stop recording', err);
-      }
-
-      console.log('Loud duration:', loudDuration);
-
-      if (loudDuration < 5) {
-        playSound('incorrect');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      } else {
-        const question = questions[currentQuestion];
-        const incorrectAnswers = question.answers.filter(
-          answer => answer !== question.correct_answer
-        );
-
-        let toRemove = loudDuration >= 10 ? 2 : 1;
-        const removed = incorrectAnswers.slice(0, toRemove);
-
-        setDisabledOptions(removed);
-        setHintsRemaining(prev => prev - 1);
-        playSound('correct');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
+      recording.current = newRecording;
+      setIsShouting(true);
       setVolumeLevel(0);
       setLoudDuration(0);
       setShoutTimer(10);
-      lastVolumeCheckTime.current = 0;
-    };
+      lastVolumeCheckTime.current = Date.now();
+      playSound('tap');
+    } catch (err) {
+      console.error('Failed to start recording', err);
+      alert('Microphone permission required');
+    }
+  };
 
-    // スワイプ終了
-    const finishSwipe = () => {
-      setIsSwiping(false);
+  /** Stop recording and evaluate sustained volume */
+  const finishShout = async () => {
+    setIsShouting(false);
 
-      if (swipeCount < 10) {
-        playSound('incorrect');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      } else {
-        const question = questions[currentQuestion];
-        const incorrectAnswers = question.answers.filter(
-          answer => answer !== question.correct_answer
-        );
-
-        let toRemove = swipeCount >= 20 ? 2 : 1;
-        const removed = incorrectAnswers.slice(0, toRemove);
-
-        setDisabledOptions(removed);
-        setHintsRemaining(prev => prev - 1);
-        playSound('correct');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      if (recording.current) {
+        await recording.current.stopAndUnloadAsync();
+        recording.current = null;
       }
+    } catch (err) {
+      console.error('Failed to stop recording', err);
+    }
 
-      setSwipeCount(0);
-      setSwipeTimer(3);
-    };
+    console.log('Loud duration:', loudDuration);
 
-    // スコアを保存する関数（難易度も保存）
-    const saveScore = async (finalScore, totalQuestions) => {
-      try {
-        const quizResult = {
-          id: Date.now().toString(),
-          category: categoryName,
-          categoryId: categoryId,
-          difficulty: difficulty, // 難易度を追加
-          score: finalScore,
-          total: totalQuestions,
-          percentage: Math.round((finalScore / totalQuestions) * 100),
-          date: new Date().toISOString(),
-          timestamp: Date.now()
-        };
+    if (loudDuration < 5) {
+      playSound('incorrect');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } else {
+      const question = questions[currentQuestion];
+      const incorrectAnswers = question.answers.filter(
+        answer => answer !== question.correct_answer
+      );
+
+      let toRemove = loudDuration >= 10 ? 2 : 1;
+      const removed = incorrectAnswers.slice(0, toRemove);
+
+      setDisabledOptions(removed);
+      setHintsRemaining(prev => prev - 1);
+      playSound('correct');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    setVolumeLevel(0);
+    setLoudDuration(0);
+    setShoutTimer(10);
+    lastVolumeCheckTime.current = 0;
+  };
+
+  // スワイプ終了
+  const finishSwipe = () => {
+    setIsSwiping(false);
+
+    if (swipeCount < 10) {
+      playSound('incorrect');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } else {
+      const question = questions[currentQuestion];
+      const incorrectAnswers = question.answers.filter(
+        answer => answer !== question.correct_answer
+      );
+
+      let toRemove = swipeCount >= 20 ? 2 : 1;
+      const removed = incorrectAnswers.slice(0, toRemove);
+
+      setDisabledOptions(removed);
+      setHintsRemaining(prev => prev - 1);
+      playSound('correct');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+
+    setSwipeCount(0);
+    setSwipeTimer(3);
+  };
+
+  // ========================================
+  // Score Management
+  // ========================================
+  /**
+   * Save quiz result to AsyncStorage
+   * Stores score, category, difficulty, timestamp, and percentage
+   */
+  const saveScore = async (finalScore, totalQuestions) => {
+    try {
+      const quizResult = {
+        id: Date.now().toString(),
+        category: categoryName,
+        categoryId: categoryId,
+        difficulty: difficulty,
+        score: finalScore,
+        total: totalQuestions,
+        percentage: Math.round((finalScore / totalQuestions) * 100),
+        date: new Date().toISOString(),
+        timestamp: Date.now()
+      };
 
       const existingHistory = await AsyncStorage.getItem('quizHistory');
       const history = existingHistory ? JSON.parse(existingHistory) : [];
@@ -496,26 +553,30 @@ function QuizScreen({ navigation, route }) {
       await AsyncStorage.setItem('quizHistory', JSON.stringify(history));
       console.log('Score saved successfully:', quizResult);
 
-      } catch (error) {
-        console.error('Error saving score:', error);
-      }
-    };
+    } catch (error) {
+      console.error('Error saving score:', error);
+    }
+  };
 
+   /**
+   * Fetch quiz questions from OpenTriviaDB API
+   * Includes error handling and fallback mechanism
+   */
   const fetchQuestions = async () => {
     setLoading(true);
     try {
       const response = await fetch(
         `https://opentdb.com/api.php?amount=10&category=${categoryId}&difficulty=${difficulty}&type=multiple`
       );
-      
+
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      
+
       const data = await response.json();
-      
+
       console.log(`Fetching ${difficulty} questions for category ${categoryId}`);
-      
+
       if (data.results.length === 0) {
         console.warn('No questions available');
         const fallbackResponse = await fetch(
@@ -536,7 +597,7 @@ function QuizScreen({ navigation, route }) {
           difficulty: q.difficulty
         };
       });
-      
+
       setQuestions(formattedQuestions);
     } catch (error) {
       console.error('Error fetching questions:', error);
@@ -547,6 +608,10 @@ function QuizScreen({ navigation, route }) {
     }
   };
 
+  /**
+   * Decode HTML entities in quiz questions and answers
+   * Converts &quot;, &#039;, &amp;, etc. to readable characters
+   */
   const decodeHTML = (html) => {
     return html
       .replace(/&quot;/g, '"')
@@ -557,12 +622,13 @@ function QuizScreen({ navigation, route }) {
       .replace(/&nbsp;/g, ' ');
   };
 
+  /** Handle answer selection and scoring */
   const handleAnswer = async (answer) => {
     setSelectedAnswer(answer);
-    
+
     const isCorrect = answer === questions[currentQuestion].correct_answer;
     playSound(isCorrect ? 'correct' : 'incorrect');
-    
+
     if (isCorrect) {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -580,13 +646,13 @@ function QuizScreen({ navigation, route }) {
       await new Promise(resolve => setTimeout(resolve, 100));
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    
+
     const newScore = isCorrect ? score + 1 : score;
-    
+
     if (isCorrect) {
       setScore(newScore);
     }
-    
+
     setTimeout(() => {
       if (currentQuestion < questions.length - 1) {
         setCurrentQuestion(currentQuestion + 1);
@@ -614,14 +680,14 @@ function QuizScreen({ navigation, route }) {
     const percentage = Math.round((score / questions.length) * 100);
     const emoji = percentage >= 80 ? '🎉' : percentage >= 60 ? '👍' : percentage >= 40 ? '😊' : '📚';
     const message = percentage >= 80 ? 'Excellent!' : percentage >= 60 ? 'Great Job!' : percentage >= 40 ? 'Good Effort!' : 'Keep Learning!';
-    
+
     return (
       <View style={styles.resultContainer}>
         <Text style={styles.resultEmoji}>{emoji}</Text>
         <Text style={styles.resultTitle}>{message}</Text>
         <Text style={styles.resultScore}>{score}/{questions.length}</Text>
         <Text style={styles.resultPercentage}>{percentage}% Correct</Text>
-        
+
         <View style={styles.resultStatsContainer}>
           <View style={styles.resultStatRow}>
             <Text style={styles.resultStatLabel}>Category</Text>
@@ -746,13 +812,13 @@ function QuizScreen({ navigation, route }) {
               SHAKE IT!
             </Text>
             <Text style={{ fontSize: 48, fontWeight: '700', color: colors.primary, marginBottom: 20 }}>
-              {shakeCount}回
+              {shakeCount} times
             </Text>
             <Text style={{ fontSize: 20, color: '#fff', marginBottom: 10 }}>
-              あと {shakeTimer}秒
+              {shakeTimer} seconds left
             </Text>
             <Text style={{ fontSize: 16, color: colors.textLight }}>
-              {shakeCount < 5 ? '💪 もっと速く！' : shakeCount < 11 ? '👍 いい感じ！' : '🔥 すごい！'}
+              {shakeCount < 5 ? '💪 Faster!' : shakeCount < 11 ? '👍 Good!' : '🔥 Amazing!'}
             </Text>
           </View>
         )}
@@ -789,9 +855,6 @@ function QuizScreen({ navigation, route }) {
           </View>
         )}
 
-
-
-
         {isShouting && (
           <View style={{
             position: 'absolute',
@@ -812,14 +875,10 @@ function QuizScreen({ navigation, route }) {
               {shoutTimer} seconds left
             </Text>
             <Text style={{ fontSize: 16, color: colors.textLight }}>
-              {loudDuration < 5 ? '📢 Keep shouting!' : loudDuration < 10 ? '👍 Good! Keep going!' : '🔥 Amazing!'} ⇠⇠⇠ 追加
+              {loudDuration < 5 ? '📢 Keep shouting!' : loudDuration < 10 ? '👍 Good! Keep going!' : '🔥 Amazing!'}
             </Text>
           </View>
         )}
-
-
-
-
 
         {/* Options */}
         <View style={styles.quizOptionsContainer}>
@@ -861,7 +920,14 @@ function QuizScreen({ navigation, route }) {
   );
 }
 
-// --- 3. History Screen (履歴) ---
+// =============================================
+// HistoryScreen - Quiz history and statistics
+// ========================================
+
+/**
+ * HistoryScreen - Display quiz history with statistics
+ * Shows performance charts, category breakdown, and past results
+ */
 function HistoryScreen({ navigation }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -874,6 +940,7 @@ function HistoryScreen({ navigation }) {
   const [chartData, setChartData] = useState(null);
   const [categoryStats, setCategoryStats] = useState([]);
 
+  /** Icon mapping for each quiz category */
   const categoryIcons = {
     'General Knowledge': '🎯',
     'Science & Nature': '🔬',
@@ -885,7 +952,7 @@ function HistoryScreen({ navigation }) {
 
   useEffect(() => {
     loadHistory();
-    
+
     const unsubscribe = navigation.addListener('focus', () => {
       loadHistory();
     });
@@ -893,6 +960,7 @@ function HistoryScreen({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
+  /** Load quiz history from AsyncStorage and calculate statistics */
   const loadHistory = async () => {
     setLoading(true);
     try {
@@ -955,6 +1023,7 @@ function HistoryScreen({ navigation }) {
     }
   };
 
+  /** Clear all quiz history data */
   const clearHistory = async () => {
     try {
       await AsyncStorage.removeItem('quizHistory');
@@ -972,6 +1041,7 @@ function HistoryScreen({ navigation }) {
     }
   };
 
+  /** Format date to relative time */
   const formatDate = (isoString) => {
     const date = new Date(isoString);
     const now = new Date();
@@ -1020,65 +1090,55 @@ function HistoryScreen({ navigation }) {
             keyExtractor={(item) => item.id}
             ListHeaderComponent={(
               <View>
-
-
-
-
-
-          {/* 統計サマリー */}
-          <View style={{ margin: 15, padding: 15, backgroundColor: '#f0f0f0', borderRadius: 8 }}>
-            <Text style={[styles.boldTitle, { marginBottom: 10 }]}>Your Stats</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-              <Text style={styles.meta}>Questions Answered:</Text>
-              <Text style={styles.boldTitle}>{stats.totalQuestions}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-              <Text style={styles.meta}>Correct Answers:</Text>
-              <Text style={styles.boldTitle}>{stats.totalCorrect}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={styles.meta}>Average Score:</Text>
-              <Text style={[styles.boldTitle, { color: stats.averageScore >= 70 ? '#4ECDC4' : '#FF6B6B' }]}>
-                {stats.averageScore}%
-              </Text>
-            </View>
-          </View>
-
-          {/* カテゴリー別成績 */}
-          {categoryStats.length > 0 && (
-            <View style={{ margin: 15 }}>
-              <Text style={[styles.boldTitle, { marginBottom: 10 }]}>Performance by Category</Text>
-              {categoryStats.map((item, index) => (
-                <View key={index} style={{ marginBottom: 10 }}>
+                {/* 統計サマリー */}
+                <View style={{ margin: 15, padding: 15, backgroundColor: '#f0f0f0', borderRadius: 8 }}>
+                  <Text style={[styles.boldTitle, { marginBottom: 10 }]}>Your Stats</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                    <Text style={styles.meta}>{item.category}</Text>
-                    <Text style={styles.boldTitle}>{item.percentage}%</Text>
+                    <Text style={styles.meta}>Questions Answered:</Text>
+                    <Text style={styles.boldTitle}>{stats.totalQuestions}</Text>
                   </View>
-                  <View style={{ height: 8, backgroundColor: '#e0e0e0', borderRadius: 4 }}>
-                    <View 
-                      style={{ 
-                        height: 8, 
-                        width: `${item.percentage}%`, 
-                        backgroundColor: item.percentage >= 70 ? '#4ECDC4' : item.percentage >= 50 ? '#FFA07A' : '#FF6B6B',
-                        borderRadius: 4 
-                      }} 
-                    />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <Text style={styles.meta}>Correct Answers:</Text>
+                    <Text style={styles.boldTitle}>{stats.totalCorrect}</Text>
                   </View>
-                  <Text style={[styles.meta, { fontSize: 10, marginTop: 2 }]}>
-                    {item.count} quiz{item.count !== 1 ? 'zes' : ''} completed
-                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={styles.meta}>Average Score:</Text>
+                    <Text style={[styles.boldTitle, { color: stats.averageScore >= 70 ? '#4ECDC4' : '#FF6B6B' }]}>
+                      {stats.averageScore}%
+                    </Text>
+                  </View>
                 </View>
-              ))}
+
+                {/* カテゴリー別成績 */}
+                {categoryStats.length > 0 && (
+                <View style={{ margin: 15 }}>
+                  <Text style={[styles.boldTitle, { marginBottom: 10 }]}>Performance by Category</Text>
+                  {categoryStats.map((item, index) => (
+                    <View key={index} style={{ marginBottom: 10 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <Text style={styles.meta}>{item.category}</Text>
+                        <Text style={styles.boldTitle}>{item.percentage}%</Text>
+                      </View>
+                      <View style={{ height: 8, backgroundColor: '#e0e0e0', borderRadius: 4 }}>
+                        <View 
+                          style={{ 
+                            height: 8, 
+                            width: `${item.percentage}%`, 
+                            backgroundColor: item.percentage >= 70 ? '#4ECDC4' : item.percentage >= 50 ? '#FFA07A' : '#FF6B6B',
+                            borderRadius: 4 
+                          }} 
+                        />
+                      </View>
+                      <Text style={[styles.meta, { fontSize: 10, marginTop: 2 }]}>
+                        {item.count} quiz{item.count !== 1 ? 'zes' : ''} completed
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              <Text style={styles.sectionLabel}>Recent Quizzes</Text>
             </View>
-          )}
-
-          <Text style={styles.sectionLabel}>Recent Quizzes</Text>
-
-
-          </View>
             )}
-
-
 
             renderItem={({ item }) => (
               <View style={styles.archiveCard}>
@@ -1099,22 +1159,29 @@ function HistoryScreen({ navigation }) {
               </View>
             )}
 
-          ListFooterComponent={
-          <TouchableOpacity
-            style={[styles.dangerButton, { margin: 15 }]}
-            onPress={clearHistory}
-          >
-            <Text style={styles.dangerButtonText}>Clear All History</Text>
-          </TouchableOpacity>
-                     }
-                     />
+            ListFooterComponent={
+              <TouchableOpacity
+                style={[styles.dangerButton, { margin: 15 }]}
+                onPress={clearHistory}
+              >
+                <Text style={styles.dangerButtonText}>Clear All History</Text>
+              </TouchableOpacity>
+            }
+          />
         </View>
       )}
     </View>
   );
 }
 
-// --- 4. Settings Screen ---
+// ========================================
+// SettingsScreen - App configuration
+// ========================================
+
+/**
+ * SettingsScreen - User preferences and app info
+ * Allows customization of difficulty, question count, and sound settings
+ */
 function SettingsScreen() {
   const [defaultDifficulty, setDefaultDifficulty] = useState('medium');
   const [questionsPerQuiz, setQuestionsPerQuiz] = useState(10);
@@ -1188,6 +1255,11 @@ function SettingsScreen() {
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
+// ========================================
+// Navigation Setup
+// ========================================
+
+/** Home stack navigator for quiz flow */
 function HomeStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -1197,6 +1269,11 @@ function HomeStack() {
   );
 }
 
+// ========================================
+// Main App Component
+// ========================================
+
+/** Root app component with navigation and context providers */
 export default function App() {
   const [textSize, setTextSize] = useState(18);
 
