@@ -773,7 +773,7 @@ function QuizScreen({ navigation, route }) {
           </Text>
         </View>
 
-        {/* Hint Selection UI */}
+        {/* Hint Selection UI
         <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
           <Text style={{ fontSize: 14, color: colors.textLight, marginBottom: 10 }}>
             💡 Hints remaining: {hintsRemaining}
@@ -813,9 +813,60 @@ function QuizScreen({ navigation, route }) {
               <Text style={[styles.secondaryButtonText, { fontSize: 12 }]}>🎤 Shout</Text>
             </TouchableOpacity>
           </View>
+        </View> */}
+
+        {/* Hint Selection UI */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+          <Text style={{ fontSize: 14, color: colors.textLight, marginBottom: 10 }}>
+            💡 Hints remaining: {hintsRemaining}
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center' }}>
+            <TouchableOpacity
+              style={[
+                styles.secondaryButton,
+                { paddingVertical: 8, paddingHorizontal: 12, minWidth: 90 },
+                (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) && { opacity: 0.5 }
+              ]}
+              onPress={(hintsRemaining > 0 && !selectedAnswer && disabledOptions.length === 0) ? startShake : undefined}
+            >
+              <Text style={[styles.secondaryButtonText, { fontSize: 11 }]}>
+                📱 Shake
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.secondaryButton,
+                { paddingVertical: 8, paddingHorizontal: 12, minWidth: 90 },
+                (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) && { opacity: 0.5 }
+              ]}
+              onPress={(hintsRemaining > 0 && !selectedAnswer && disabledOptions.length === 0) ? startSwipe : undefined}
+            >
+              <Text style={[styles.secondaryButtonText, { fontSize: 11 }]}>
+                👆 Swipe
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.secondaryButton,
+                { paddingVertical: 8, paddingHorizontal: 12, minWidth: 90 },
+                (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) && { opacity: 0.5 }
+              ]}
+              onPress={(hintsRemaining > 0 && !selectedAnswer && disabledOptions.length === 0) ? startShout : undefined}
+            >
+              <Text style={[styles.secondaryButtonText, { fontSize: 11 }]}>
+                🎤 Shout
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* シェイク中のオーバーレイ */}
+
+
+
+        {/* Overlay during shaking */}
         {isShaking && (
           <View style={{
             position: 'absolute',
