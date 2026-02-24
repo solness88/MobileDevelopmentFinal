@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { Accelerometer } from 'expo-sensors';
+import NetInfo from '@react-native-community/netinfo';
 
 const SettingsContext = createContext();
 
@@ -46,6 +47,14 @@ const playSound = async (soundName) => {
 // --- 1. Home Screen (Select category) ---
 function HomeScreen({ navigation }) {
   const [selectedDifficulty, setSelectedDifficulty] = useState('medium'); // Default defficulty is medium
+  const [isConnected, setIsConnected] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsConnected(state.isConnected);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const categories = [
     { id: 9, name: 'General Knowledge', icon: '🎯', color: colors.categories.general },
@@ -67,7 +76,15 @@ function HomeScreen({ navigation }) {
       <View style={styles.header}>
         <Text style={styles.headerText}>Daily Quiz</Text>
       </View>
-      
+
+      {!isConnected && (
+        <View style={{ backgroundColor: '#FF6B6B', padding: 12 }}>
+          <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600' }}>
+            📡 It's offline. Cannot start Quizzes.
+          </Text>
+        </View>
+      )}
+
       {/* 難易度選択 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
         {difficulties.map(difficulty => (
@@ -105,6 +122,10 @@ function HomeScreen({ navigation }) {
             <TouchableOpacity 
               style={styles.categoryCardEnhanced}
               onPress={() => {
+                if (!isConnected) {
+                  alert('Please access to the internet.');
+                  return;
+                }
                 playSound('tap');
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 navigation.navigate('Quiz', { 
