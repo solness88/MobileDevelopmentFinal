@@ -2,7 +2,7 @@ import React, { createContext, useEffect, useState, useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, FlatList } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { styles, colors } from './styles';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -94,43 +94,47 @@ function HomeScreen({ navigation }) {
         ))}
       </ScrollView>
 
-      <ScrollView style={styles.flex1}>
-        <Text style={styles.sectionLabel}>Choose a Category</Text>
-        
-        {categories.map((category) => (
-          <TouchableOpacity 
-            key={category.id}
-            style={styles.categoryCardEnhanced}
-            onPress={() => {
-              playSound('tap');
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              navigation.navigate('Quiz', { 
-                categoryId: category.id,
-                categoryName: category.name,
-                difficulty: selectedDifficulty
-              });
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.categoryAccentBar, { backgroundColor: category.color }]} />
-            <View style={styles.categoryCardBody}>
-              <View style={[
-                styles.categoryIconContainer,
-                { backgroundColor: category.color + '20' }
-              ]}>
-                <Text style={styles.categoryIcon}>{category.icon}</Text>
+      <View style={styles.flex1}>
+        <FlatList
+          data={categories}
+          keyExtractor={(item) => item.id.toString()}
+          ListHeaderComponent={
+            <Text style={styles.sectionLabel}>Choose a Category</Text>
+          }
+          renderItem={({ item: category }) => (
+            <TouchableOpacity 
+              style={styles.categoryCardEnhanced}
+              onPress={() => {
+                playSound('tap');
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                navigation.navigate('Quiz', { 
+                  categoryId: category.id,
+                  categoryName: category.name,
+                  difficulty: selectedDifficulty
+                });
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.categoryAccentBar, { backgroundColor: category.color }]} />
+              <View style={styles.categoryCardBody}>
+                <View style={[
+                  styles.categoryIconContainer,
+                  { backgroundColor: category.color + '20' }
+                ]}>
+                  <Text style={styles.categoryIcon}>{category.icon}</Text>
+                </View>
+                <View style={styles.categoryTextContainer}>
+                  <Text style={styles.categoryTitle}>{category.name}</Text>
+                  <Text style={styles.categoryMeta}>
+                    {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} • 10 questions
+                  </Text>
+                </View>
+                <Text style={styles.categoryArrow}>›</Text>
               </View>
-              <View style={styles.categoryTextContainer}>
-                <Text style={styles.categoryTitle}>{category.name}</Text>
-                <Text style={styles.categoryMeta}>
-                  {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} • 10 questions
-                </Text>
-              </View>
-              <Text style={styles.categoryArrow}>›</Text>
-            </View>
-        </TouchableOpacity>
-        ))}
-      </ScrollView>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
     </View>
   );
 }
@@ -278,17 +282,20 @@ function QuizScreen({ navigation, route }) {
   const fetchQuestions = async () => {
     setLoading(true);
     try {
-      // APIリクエストに難易度を追加
       const response = await fetch(
         `https://opentdb.com/api.php?amount=10&category=${categoryId}&difficulty=${difficulty}&type=multiple`
       );
+      
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      
       const data = await response.json();
       
       console.log(`Fetching ${difficulty} questions for category ${categoryId}`);
       
       if (data.results.length === 0) {
-        console.warn('No questions available for this difficulty/category combination');
-        // フォールバック: 難易度なしで再取得
+        console.warn('No questions available');
         const fallbackResponse = await fetch(
           `https://opentdb.com/api.php?amount=10&category=${categoryId}&type=multiple`
         );
@@ -311,6 +318,8 @@ function QuizScreen({ navigation, route }) {
       setQuestions(formattedQuestions);
     } catch (error) {
       console.error('Error fetching questions:', error);
+      alert('Failed to load quiz. Please check your connection and try again.');
+      navigation.goBack();
     } finally {
       setLoading(false);
     }
@@ -695,7 +704,19 @@ function HistoryScreen({ navigation }) {
           <Text style={styles.meta}>Complete a quiz to see your results here</Text>
         </View>
       ) : (
-        <ScrollView style={styles.flex1}>
+        <View style={styles.flex1}>
+
+
+          <FlatList
+            data={history}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={(
+              <View>
+
+
+
+
+
           {/* 統計サマリー */}
           <View style={{ margin: 15, padding: 15, backgroundColor: '#f0f0f0', borderRadius: 8 }}>
             <Text style={[styles.boldTitle, { marginBottom: 10 }]}>Your Stats</Text>
@@ -745,34 +766,41 @@ function HistoryScreen({ navigation }) {
 
           <Text style={styles.sectionLabel}>Recent Quizzes</Text>
 
-          {/* 履歴リスト */}
-          {history.map((item) => (
-            <View key={item.id} style={styles.archiveCard}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.tag}>[{item.category}]</Text>
-                  <Text style={styles.boldTitle}>
-                    Score: {item.score}/{item.total} ({item.percentage}%)
-                  </Text>
-                  <Text style={styles.meta}>
-                    {item.difficulty ? item.difficulty.charAt(0).toUpperCase() + item.difficulty.slice(1) : 'Mixed'} • {formatDate(item.date)}
+
+          </View>
+            )}
+
+
+
+            renderItem={({ item }) => (
+              <View style={styles.archiveCard}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.tag}>[{item.category}]</Text>
+                    <Text style={styles.boldTitle}>
+                      Score: {item.score}/{item.total} ({item.percentage}%)
+                    </Text>
+                    <Text style={styles.meta}>
+                      {item.difficulty ? item.difficulty.charAt(0).toUpperCase() + item.difficulty.slice(1) : 'Mixed'} • {formatDate(item.date)}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 30 }}>
+                    {categoryIcons[item.category] || '📝'}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 30 }}>
-                  {categoryIcons[item.category] || '📝'}
-                </Text>
               </View>
-            </View>
-          ))}
+            )}
 
-          {/* クリアボタン */}
-          <TouchableOpacity 
+          ListFooterComponent={
+          <TouchableOpacity
             style={[styles.dangerButton, { margin: 15 }]}
             onPress={clearHistory}
           >
             <Text style={styles.dangerButtonText}>Clear All History</Text>
           </TouchableOpacity>
-        </ScrollView>
+                     }
+                     />
+        </View>
       )}
     </View>
   );
@@ -780,24 +808,68 @@ function HistoryScreen({ navigation }) {
 
 // --- 4. Settings Screen ---
 function SettingsScreen() {
+  const [defaultDifficulty, setDefaultDifficulty] = useState('medium');
+  const [questionsPerQuiz, setQuestionsPerQuiz] = useState(10);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  const difficulties = ['easy', 'medium', 'hard'];
+  const questionOptions = [5, 10, 15];
+
   return (
     <ScrollView style={styles.settingsBg}>
       <View style={styles.header}>
         <Text style={styles.headerText}>Settings</Text>
       </View>
-      <Text style={styles.sectionLabel}>Settings</Text>
-      
+
       <View style={styles.settingsGroup}>
         <View style={styles.groupHeader}>
-          <Text style={styles.groupTitle}>Preferences</Text>
+          <Text style={styles.groupTitle}>Quiz Settings</Text>
         </View>
-        <View style={styles.settingsRow}>
+
+        <TouchableOpacity
+          style={styles.settingsRow}
+          onPress={() => {
+            const currentIndex = difficulties.indexOf(defaultDifficulty);
+            const nextIndex = (currentIndex + 1) % difficulties.length;
+            setDefaultDifficulty(difficulties[nextIndex]);
+          }}
+        >
           <Text>Default Difficulty</Text>
-          <Text>Medium →</Text>
+          <Text style={{ color: colors.primary, fontWeight: '600' }}>
+            {defaultDifficulty.charAt(0).toUpperCase() + defaultDifficulty.slice(1)} →
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.settingsRow}
+          onPress={() => {
+            const currentIndex = questionOptions.indexOf(questionsPerQuiz);
+            const nextIndex = (currentIndex + 1) % questionOptions.length;
+            setQuestionsPerQuiz(questionOptions[nextIndex]);
+          }}
+        >
+          <Text>Questions per Quiz</Text>
+          <Text style={{ color: colors.primary, fontWeight: '600' }}>{questionsPerQuiz} →</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.settingsRow}
+          onPress={() => setSoundEnabled(!soundEnabled)}
+        >
+          <Text>Sound Effects</Text>
+          <Text style={{ color: colors.primary, fontWeight: '600' }}>
+            {soundEnabled ? 'ON' : 'OFF'} →
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.settingsGroup}>
+        <View style={styles.groupHeader}>
+          <Text style={styles.groupTitle}>About</Text>
         </View>
         <View style={styles.settingsRow}>
-          <Text>Questions per Quiz</Text>
-          <Text>10 →</Text>
+          <Text>Version</Text>
+          <Text style={styles.meta}>1.0.0</Text>
         </View>
       </View>
     </ScrollView>
