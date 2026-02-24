@@ -49,6 +49,8 @@ const loadSounds = async () => {
       incorrect: require('./assets/sounds/incorrect.mp3'),
       tap: require('./assets/sounds/tap.mp3'),
       complete: require('./assets/sounds/complete.mp3'),
+      hint_1: require('./assets/sounds/hint_1.mp3'),
+      hint_2: require('./assets/sounds/hint_2.mp3'),
     };
 
     for (const [key, source] of Object.entries(sounds)) {
@@ -237,7 +239,6 @@ function QuizScreen({ navigation, route }) {
   const [swipeCount, setSwipeCount] = useState(0);
   const [swipeTimer, setSwipeTimer] = useState(3);
 
-  // マイク用state
   const [isShouting, setIsShouting] = useState(false);
   const [volumeLevel, setVolumeLevel] = useState(0);
   const [shoutTimer, setShoutTimer] = useState(10);
@@ -253,6 +254,7 @@ function QuizScreen({ navigation, route }) {
 
   useEffect(() => {
     fetchQuestions();
+    setHintsRemaining(3);
   }, []);
 
   // =================================
@@ -348,7 +350,8 @@ function QuizScreen({ navigation, route }) {
   const finishShake = () => {
     console.log('finishShake called, shakeCount:', shakeCount);
     setIsShaking(false);
-    
+    setHintsRemaining(prev => prev - 1);
+
     if (shakeCount < 5) {
       console.log('Shake failed - too few shakes');
       playSound('incorrect');
@@ -361,14 +364,13 @@ function QuizScreen({ navigation, route }) {
         answer => answer !== question.correct_answer
       );
       console.log('Incorrect answers:', incorrectAnswers);
-      
+
       let toRemove = shakeCount >= 11 ? 2 : 1;
       const removed = incorrectAnswers.slice(0, toRemove);
       console.log('Removing options:', removed);
-      
+
       setDisabledOptions(removed);
-      setHintsRemaining(prev => prev - 1);
-      playSound('correct');
+      playSound(toRemove === 2 ? 'hint_2' : 'hint_1');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
@@ -459,6 +461,7 @@ function QuizScreen({ navigation, route }) {
   /** Stop recording and evaluate sustained volume */
   const finishShout = async () => {
     setIsShouting(false);
+    setHintsRemaining(prev => prev - 1);
 
     try {
       if (recording.current) {
@@ -470,6 +473,7 @@ function QuizScreen({ navigation, route }) {
     }
 
     console.log('Loud duration:', loudDuration);
+    console.log('Volume level:', volumeLevel);
 
     if (loudDuration < 5) {
       playSound('incorrect');
@@ -480,14 +484,27 @@ function QuizScreen({ navigation, route }) {
         answer => answer !== question.correct_answer
       );
 
-      let toRemove = loudDuration >= 10 ? 2 : 1;
-      const removed = incorrectAnswers.slice(0, toRemove);
+      let toRemove;
+      if (loudDuration >= 5 && volumeLevel >= 120) {
+        toRemove = 2;
+      } else if (loudDuration >= 10) {
+        toRemove = 1;
+      } else {
+        toRemove = 0;
+      }
+      
+      if (toRemove === 0) {
+        playSound('incorrect');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } else {
+        const removed = incorrectAnswers.slice(0, toRemove);
 
-      setDisabledOptions(removed);
-      setHintsRemaining(prev => prev - 1);
-      playSound('correct');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setDisabledOptions(removed);
+        playSound(toRemove === 2 ? 'hint_2' : 'hint_1');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     }
+
     setVolumeLevel(0);
     setLoudDuration(0);
     setShoutTimer(10);
@@ -497,6 +514,7 @@ function QuizScreen({ navigation, route }) {
   // スワイプ終了
   const finishSwipe = () => {
     setIsSwiping(false);
+    setHintsRemaining(prev => prev - 1);
 
     if (swipeCount < 10) {
       playSound('incorrect');
@@ -511,8 +529,7 @@ function QuizScreen({ navigation, route }) {
       const removed = incorrectAnswers.slice(0, toRemove);
 
       setDisabledOptions(removed);
-      setHintsRemaining(prev => prev - 1);
-      playSound('correct');
+      playSound(toRemove === 2 ? 'hint_2' : 'hint_1');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
@@ -714,6 +731,7 @@ function QuizScreen({ navigation, route }) {
               setScore(0);
               setSelectedAnswer(null);
               setShowResult(false);
+              setHintsRemaining(3);
               fetchQuestions();
             }}
           >
