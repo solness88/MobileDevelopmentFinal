@@ -618,7 +618,7 @@ function QuizScreen({ navigation, route }) {
       setQuestions(formattedQuestions);
     } catch (error) {
       console.error('Error fetching questions:', error);
-      alert('Failed to load quiz. Please check your connection and try again.');
+      alert('Failed to load quiz. Please check  connection and try again.');
       navigation.goBack();
     } finally {
       setLoading(false);
