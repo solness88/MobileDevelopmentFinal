@@ -435,10 +435,11 @@ function QuizScreen({ navigation, route }) {
 
             // 持続時間カウント
             const now = Date.now();
-            if (volume >= 60 && lastVolumeCheckTime.current > 0) {
+            if (volume >= 120 && lastVolumeCheckTime.current > 0) {
               const elapsed = (now - lastVolumeCheckTime.current) / 1000;
               setLoudDuration(prev => prev + elapsed);
             }
+
             lastVolumeCheckTime.current = now;
           }
         },
@@ -462,7 +463,6 @@ function QuizScreen({ navigation, route }) {
   const finishShout = async () => {
     setIsShouting(false);
     setHintsRemaining(prev => prev - 1);
-
     try {
       if (recording.current) {
         await recording.current.stopAndUnloadAsync();
@@ -471,10 +471,6 @@ function QuizScreen({ navigation, route }) {
     } catch (err) {
       console.error('Failed to stop recording', err);
     }
-
-    console.log('Loud duration:', loudDuration);
-    console.log('Volume level:', volumeLevel);
-
     if (loudDuration < 5) {
       playSound('incorrect');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -485,9 +481,9 @@ function QuizScreen({ navigation, route }) {
       );
 
       let toRemove;
-      if (loudDuration >= 5 && volumeLevel >= 120) {
+      if (loudDuration >= 10 && volumeLevel >= 120) {
         toRemove = 2;
-      } else if (loudDuration >= 10) {
+      } else if (loudDuration >= 5) {
         toRemove = 1;
       } else {
         toRemove = 0;
@@ -618,7 +614,7 @@ function QuizScreen({ navigation, route }) {
       setQuestions(formattedQuestions);
     } catch (error) {
       console.error('Error fetching questions:', error);
-      alert('Failed to load quiz. Please check  connection and try again.');
+      alert('Failed to load quiz. Please check internet connection and try again.');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -1354,7 +1350,15 @@ export default function App() {
     <SettingsContext.Provider value={{ textSize, setTextSize }}>
       <NavigationContainer>
         <Tab.Navigator screenOptions={{ headerShown: false }}>
-          <Tab.Screen name="Home" component={HomeStack} />
+          <Tab.Screen 
+            name="Home" 
+            component={HomeStack}
+            listeners={({ navigation }) => ({
+              tabPress: (e) => {
+                navigation.navigate('Home', { screen: 'MainHome' });
+              },
+            })}
+          />
           <Tab.Screen name="History">
             {(props) => <HistoryScreen {...props} />}
           </Tab.Screen>
