@@ -17,7 +17,7 @@ import React, { createContext, useEffect, useState, useContext, useRef } from 'r
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, FlatList } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, FlatList, Alert } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { styles, colors } from './styles';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -251,11 +251,26 @@ function QuizScreen({ navigation, route }) {
 
   const recording = useRef(null);
   const lastVolumeCheckTime = useRef(0);
+  const lastFetchTime = useRef(0);
 
   useEffect(() => {
     fetchQuestions();
     setHintsRemaining(3);
   }, []);
+
+  // Reset if the user move to History or Settings during quiz challenge
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      if (!showResult) {
+        setCurrentQuestion(0);
+        setScore(0);
+        setSelectedAnswer(null);
+        setHintsRemaining(3);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, showResult]);
 
   // =================================
   // Shake Hint System (Accelerometer)
@@ -575,51 +590,127 @@ function QuizScreen({ navigation, route }) {
    * Fetch quiz questions from OpenTriviaDB API
    * Includes error handling and fallback mechanism
    */
-  const fetchQuestions = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `https://opentdb.com/api.php?amount=10&category=${categoryId}&difficulty=${difficulty}&type=multiple`
-      );
+  // const fetchQuestions = async () => {
+  //   setLoading(true);
+  //   try {
+  //     const response = await fetch(
+  //       `https://opentdb.com/api.php?amount=10&category=${categoryId}&difficulty=${difficulty}&type=multiple`
+  //     );
 
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
+  //     if (!response.ok) {
+  //       throw new Error('Network response was not ok');
+  //     }
 
-      const data = await response.json();
+  //     const data = await response.json();
 
-      console.log(`Fetching ${difficulty} questions for category ${categoryId}`);
+  //     console.log(`Fetching ${difficulty} questions for category ${categoryId}`);
 
-      if (data.results.length === 0) {
-        console.warn('No questions available');
-        const fallbackResponse = await fetch(
-          `https://opentdb.com/api.php?amount=10&category=${categoryId}&type=multiple`
-        );
-        const fallbackData = await fallbackResponse.json();
-        data.results = fallbackData.results;
-      }
+  //     if (data.results.length === 0) {
+  //       console.warn('No questions available');
+  //       const fallbackResponse = await fetch(
+  //         `https://opentdb.com/api.php?amount=10&category=${categoryId}&type=multiple`
+  //       );
+  //       const fallbackData = await fallbackResponse.json();
+  //       data.results = fallbackData.results;
+  //     }
       
-      const formattedQuestions = data.results.map(q => {
-        const allAnswers = [...q.incorrect_answers, q.correct_answer];
-        const shuffled = allAnswers.sort(() => Math.random() - 0.5);
+  //     const formattedQuestions = data.results.map(q => {
+  //       const allAnswers = [...q.incorrect_answers, q.correct_answer];
+  //       const shuffled = allAnswers.sort(() => Math.random() - 0.5);
         
-        return {
-          question: decodeHTML(q.question),
-          correct_answer: decodeHTML(q.correct_answer),
-          answers: shuffled.map(a => decodeHTML(a)),
-          difficulty: q.difficulty
-        };
-      });
+  //       return {
+  //         question: decodeHTML(q.question),
+  //         correct_answer: decodeHTML(q.correct_answer),
+  //         answers: shuffled.map(a => decodeHTML(a)),
+  //         difficulty: q.difficulty
+  //       };
+  //     });
 
-      setQuestions(formattedQuestions);
-    } catch (error) {
-      console.error('Error fetching questions:', error);
-      alert('Failed to load quiz. Please check internet connection and try again.');
-      navigation.goBack();
-    } finally {
-      setLoading(false);
+  //     setQuestions(formattedQuestions);
+  //   } catch (error) {
+  //     console.error('Error fetching questions:', error);
+  //     alert('Failed to load quiz. Please check internet connection and try again.');
+  //     navigation.goBack();
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+
+
+/**
+   * Fetch quiz questions from OpenTriviaDB API
+   * Includes error handling and fallback mechanism
+   */
+const fetchQuestions = async () => {
+  // 5秒以内の再コールを防ぐ
+  const now = Date.now();
+  const timeSinceLastFetch = now - lastFetchTime.current;
+  
+  console.log('=== FETCH QUESTIONS DEBUG ===');
+  console.log('Current time:', now);
+  console.log('Last fetch time:', lastFetchTime.current);
+  console.log('Time since last fetch:', timeSinceLastFetch, 'ms');
+
+
+
+  if (timeSinceLastFetch < 5000) {
+    const waitTime = 5000 - timeSinceLastFetch;
+    console.log(`Waiting ${waitTime}ms to avoid rate limit...`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  lastFetchTime.current = Date.now();
+  
+  setLoading(true);
+  try {
+    const response = await fetch(
+      `https://opentdb.com/api.php?amount=10&category=${categoryId}&difficulty=${difficulty}&type=multiple`
+    );
+
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
     }
-  };
+
+    const data = await response.json();
+
+    console.log(`Fetching ${difficulty} questions for category ${categoryId}`);
+
+    if (data.results.length === 0) {
+      console.warn('No questions available');
+      const fallbackResponse = await fetch(
+        `https://opentdb.com/api.php?amount=10&category=${categoryId}&type=multiple`
+      );
+      const fallbackData = await fallbackResponse.json();
+      data.results = fallbackData.results;
+    }
+    
+    const formattedQuestions = data.results.map(q => {
+      const allAnswers = [...q.incorrect_answers, q.correct_answer];
+      const shuffled = allAnswers.sort(() => Math.random() - 0.5);
+      
+      return {
+        question: decodeHTML(q.question),
+        correct_answer: decodeHTML(q.correct_answer),
+        answers: shuffled.map(a => decodeHTML(a)),
+        difficulty: q.difficulty
+      };
+    });
+
+    setQuestions(formattedQuestions);
+  } catch (error) {
+    console.error('Error fetching questions:', error);
+    alert('Failed to load quiz. Please check your connection and try again.');
+    navigation.goBack();
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
+
 
   /**
    * Decode HTML entities in quiz questions and answers
