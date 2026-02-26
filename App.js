@@ -220,6 +220,10 @@ function HomeScreen({ navigation }) {
  * - Swipe: Touch screen rapid swiping
  * - Shout: Microphone volume detection
  */
+
+/** Last API fetch timestamp to prevent rate limiting */
+let globalLastFetchTime = 0;
+
 function QuizScreen({ navigation, route }) {
   const { categoryId, categoryName, difficulty } = route.params;
   const [questions, setQuestions] = useState([]);
@@ -251,7 +255,6 @@ function QuizScreen({ navigation, route }) {
 
   const recording = useRef(null);
   const lastVolumeCheckTime = useRef(0);
-  const lastFetchTime = useRef(0);
 
   useEffect(() => {
     fetchQuestions();
@@ -586,131 +589,67 @@ function QuizScreen({ navigation, route }) {
     }
   };
 
-   /**
-   * Fetch quiz questions from OpenTriviaDB API
-   * Includes error handling and fallback mechanism
-   */
-  // const fetchQuestions = async () => {
-  //   setLoading(true);
-  //   try {
-  //     const response = await fetch(
-  //       `https://opentdb.com/api.php?amount=10&category=${categoryId}&difficulty=${difficulty}&type=multiple`
-  //     );
-
-  //     if (!response.ok) {
-  //       throw new Error('Network response was not ok');
-  //     }
-
-  //     const data = await response.json();
-
-  //     console.log(`Fetching ${difficulty} questions for category ${categoryId}`);
-
-  //     if (data.results.length === 0) {
-  //       console.warn('No questions available');
-  //       const fallbackResponse = await fetch(
-  //         `https://opentdb.com/api.php?amount=10&category=${categoryId}&type=multiple`
-  //       );
-  //       const fallbackData = await fallbackResponse.json();
-  //       data.results = fallbackData.results;
-  //     }
-      
-  //     const formattedQuestions = data.results.map(q => {
-  //       const allAnswers = [...q.incorrect_answers, q.correct_answer];
-  //       const shuffled = allAnswers.sort(() => Math.random() - 0.5);
-        
-  //       return {
-  //         question: decodeHTML(q.question),
-  //         correct_answer: decodeHTML(q.correct_answer),
-  //         answers: shuffled.map(a => decodeHTML(a)),
-  //         difficulty: q.difficulty
-  //       };
-  //     });
-
-  //     setQuestions(formattedQuestions);
-  //   } catch (error) {
-  //     console.error('Error fetching questions:', error);
-  //     alert('Failed to load quiz. Please check internet connection and try again.');
-  //     navigation.goBack();
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
-
-
 /**
-   * Fetch quiz questions from OpenTriviaDB API
-   * Includes error handling and fallback mechanism
-   */
-const fetchQuestions = async () => {
-  // 5秒以内の再コールを防ぐ
-  const now = Date.now();
-  const timeSinceLastFetch = now - lastFetchTime.current;
+  * Fetch quiz questions from OpenTriviaDB API
+  * Includes error handling and fallback mechanism
+  */
+  const fetchQuestions = async () => {
+    // 5秒以内の再コールを防ぐ
+    const now = Date.now();
+    const timeSinceLastFetch = now - globalLastFetchTime;
   
-  console.log('=== FETCH QUESTIONS DEBUG ===');
-  console.log('Current time:', now);
-  console.log('Last fetch time:', lastFetchTime.current);
-  console.log('Time since last fetch:', timeSinceLastFetch, 'ms');
-
-
-
-  if (timeSinceLastFetch < 5000) {
-    const waitTime = 5000 - timeSinceLastFetch;
-    console.log(`Waiting ${waitTime}ms to avoid rate limit...`);
-    await new Promise(resolve => setTimeout(resolve, waitTime));
-  }
-  
-  lastFetchTime.current = Date.now();
-  
-  setLoading(true);
-  try {
-    const response = await fetch(
-      `https://opentdb.com/api.php?amount=10&category=${categoryId}&difficulty=${difficulty}&type=multiple`
-    );
-
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-
-    const data = await response.json();
-
-    console.log(`Fetching ${difficulty} questions for category ${categoryId}`);
-
-    if (data.results.length === 0) {
-      console.warn('No questions available');
-      const fallbackResponse = await fetch(
-        `https://opentdb.com/api.php?amount=10&category=${categoryId}&type=multiple`
-      );
-      const fallbackData = await fallbackResponse.json();
-      data.results = fallbackData.results;
+    if (timeSinceLastFetch < 7000) {
+      const waitTime = 7000 - timeSinceLastFetch;
+      console.log(`Waiting ${waitTime}ms to avoid rate limit...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
     
-    const formattedQuestions = data.results.map(q => {
-      const allAnswers = [...q.incorrect_answers, q.correct_answer];
-      const shuffled = allAnswers.sort(() => Math.random() - 0.5);
+    globalLastFetchTime = Date.now();
+    
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `https://opentdb.com/api.php?amount=10&category=${categoryId}&difficulty=${difficulty}&type=multiple`
+      );
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const data = await response.json();
+
+      console.log(`Fetching ${difficulty} questions for category ${categoryId}`);
+
+      if (data.results.length === 0) {
+        console.warn('No questions available');
+        const fallbackResponse = await fetch(
+          `https://opentdb.com/api.php?amount=10&category=${categoryId}&type=multiple`
+        );
+        const fallbackData = await fallbackResponse.json();
+        data.results = fallbackData.results;
+      }
       
-      return {
-        question: decodeHTML(q.question),
-        correct_answer: decodeHTML(q.correct_answer),
-        answers: shuffled.map(a => decodeHTML(a)),
-        difficulty: q.difficulty
-      };
-    });
+      const formattedQuestions = data.results.map(q => {
+        const allAnswers = [...q.incorrect_answers, q.correct_answer];
+        const shuffled = allAnswers.sort(() => Math.random() - 0.5);
+        
+        return {
+          question: decodeHTML(q.question),
+          correct_answer: decodeHTML(q.correct_answer),
+          answers: shuffled.map(a => decodeHTML(a)),
+          difficulty: q.difficulty
+        };
+      });
 
-    setQuestions(formattedQuestions);
-  } catch (error) {
-    console.error('Error fetching questions:', error);
-    alert('Failed to load quiz. Please check your connection and try again.');
-    navigation.goBack();
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-
-
-
+      setQuestions(formattedQuestions);
+    } catch (error) {
+      console.error('Error fetching questions:', error);
+      alert('Failed to load quiz. Please check your connection and try again.');
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   /**
    * Decode HTML entities in quiz questions and answers
@@ -859,48 +798,6 @@ const fetchQuestions = async () => {
             Question {currentQuestion + 1} of {questions.length} • {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} • Score: {score}
           </Text>
         </View>
-
-        {/* Hint Selection UI
-        <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-          <Text style={{ fontSize: 14, color: colors.textLight, marginBottom: 10 }}>
-            💡 Hints remaining: {hintsRemaining}
-          </Text>
-
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity
-              style={[
-                styles.secondaryButton,
-                { flex: 1, paddingVertical: 8 },
-                (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) && { opacity: 0.5 }
-              ]}
-              onPress={(hintsRemaining > 0 && !selectedAnswer && disabledOptions.length === 0) ? startShake : undefined}
-            >
-              <Text style={[styles.secondaryButtonText, { fontSize: 12 }]}>📱 Shake</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.secondaryButton,
-                { flex: 1, paddingVertical: 8 },
-                (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) && { opacity: 0.5 }
-              ]}
-              onPress={(hintsRemaining > 0 && !selectedAnswer && disabledOptions.length === 0) ? startSwipe : undefined}
-            >
-              <Text style={[styles.secondaryButtonText, { fontSize: 12 }]}>👆 Swipe</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.secondaryButton,
-                { flex: 1, paddingVertical: 8 },
-                (hintsRemaining <= 0 || selectedAnswer || disabledOptions.length > 0) && { opacity: 0.5 }
-              ]}
-              onPress={(hintsRemaining > 0 && !selectedAnswer && disabledOptions.length === 0) ? startShout : undefined}
-            >
-              <Text style={[styles.secondaryButtonText, { fontSize: 12 }]}>🎤 Shout</Text>
-            </TouchableOpacity>
-          </View>
-        </View> */}
 
         {/* Hint Selection UI */}
         <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
