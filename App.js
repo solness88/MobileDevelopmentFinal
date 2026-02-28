@@ -960,8 +960,8 @@ function QuizScreen({ navigation, route }) {
                   styles.optionText,
                   isDisabled && { textDecorationLine: 'line-through', color: '#999' }
                 ]}>
-                  {showCorrect && '✅ '}
-                  {showIncorrect && '❌ '}
+                  {showCorrect && <Text style={{ color: '#4CAF50', fontWeight: 'bold' }}>✓ </Text>}
+                  {showIncorrect && <Text style={{ color: '#FF6B6B', fontWeight: 'bold' }}>✕ </Text>}
                   {answer}
                 </Text>
               </TouchableOpacity>
@@ -1337,21 +1337,41 @@ export default function App() {
   return (
     <SettingsContext.Provider value={{ textSize, setTextSize }}>
       <NavigationContainer>
-        <Tab.Navigator screenOptions={{ headerShown: false }}>
-          <Tab.Screen 
-            name="Home" 
-            component={HomeStack}
-            listeners={({ navigation }) => ({
-              tabPress: (e) => {
-                navigation.navigate('Home', { screen: 'MainHome' });
-              },
-            })}
-          />
-          <Tab.Screen name="History">
-            {(props) => <HistoryScreen {...props} />}
-          </Tab.Screen>
-          <Tab.Screen name="Settings" component={SettingsScreen} />
-        </Tab.Navigator>
+      <Tab.Navigator screenOptions={{ headerShown: false }}>
+        <Tab.Screen 
+          name="Home" 
+          component={HomeStack}
+          options={{
+            tabBarIcon: ({ color, size }) => (
+              <Text style={{ fontSize: 24 }}>🏠</Text>
+            ),
+          }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              navigation.navigate('Home', { screen: 'MainHome' });
+            },
+          })}
+        />
+        <Tab.Screen 
+          name="History"
+          options={{
+            tabBarIcon: ({ color, size }) => (
+              <Text style={{ fontSize: 24 }}>📊</Text>
+            ),
+          }}
+        >
+          {(props) => <HistoryScreen {...props} />}
+        </Tab.Screen>
+        <Tab.Screen 
+          name="Settings" 
+          component={SettingsScreen}
+          options={{
+            tabBarIcon: ({ color, size }) => (
+              <Text style={{ fontSize: 24 }}>⚙️</Text>
+            ),
+          }}
+        />
+      </Tab.Navigator>
       </NavigationContainer>
     </SettingsContext.Provider>
   );

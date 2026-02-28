@@ -341,7 +341,8 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: colors.border,
-    shadowColor: '#000',
+    elevation: 0,
+    shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -352,6 +353,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primary + '10',
   },
   optionButtonCorrect: {
+    backgroundColor: '#4CAF50',
     borderColor: colors.success,
     backgroundColor: colors.success + '20',
   },
