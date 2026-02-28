@@ -594,10 +594,10 @@ function QuizScreen({ navigation, route }) {
   * Includes error handling and fallback mechanism
   */
   const fetchQuestions = async () => {
-    // 5秒以内の再コールを防ぐ
+
+    // Prevent the second call within 5 seconds
     const now = Date.now();
     const timeSinceLastFetch = now - globalLastFetchTime;
-  
     if (timeSinceLastFetch < 7000) {
       const waitTime = 7000 - timeSinceLastFetch;
       console.log(`Waiting ${waitTime}ms to avoid rate limit...`);
