@@ -456,4 +456,36 @@ export const styles = StyleSheet.create({
   difficultyChipTextSelected: {
     color: '#fff',
   },
+  // Settings Screen styles
+  settingsGroupTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 15,
+    marginTop: 10,
+  },
+
+  settingItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+
+  settingLabel: {
+    fontSize: 16,
+    color: colors.text,
+  },
+
+  settingValue: {
+    fontSize: 16,
+    color: colors.primary,
+    fontWeight: '600',
+  },
 });

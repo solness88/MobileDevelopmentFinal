@@ -68,6 +68,23 @@ const loadSounds = async () => {
  */
 const playSound = async (soundName) => {
   try {
+
+
+
+
+    const settings = await AsyncStorage.getItem('appSettings');
+    if (settings) {
+      const parsed = JSON.parse(settings);
+      if (parsed.soundEnabled === false) {
+        console.log('Sound disabled in settings');
+        return;
+      }
+    }
+
+
+
+
+
     const sound = soundObjects[soundName];
     if (sound) {
       await sound.replayAsync();
@@ -88,6 +105,51 @@ const playSound = async (soundName) => {
 function HomeScreen({ navigation }) {
   const [selectedDifficulty, setSelectedDifficulty] = useState('medium'); // Default defficulty is medium
   const [isConnected, setIsConnected] = useState(true);
+  const [questionsPerQuiz, setQuestionsPerQuiz] = useState(10);
+
+
+
+
+
+  useEffect(() => {
+    loadDefaultSettings();
+    
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadDefaultSettings();
+    });
+    
+    return unsubscribe;
+  }, [navigation])
+
+  const loadDefaultSettings = async () => {
+    try {
+      const settings = await AsyncStorage.getItem('appSettings');
+      if (settings) {
+        const parsed = JSON.parse(settings);
+        console.log('Loaded settings:', parsed);
+        if (parsed.defaultDifficulty) {
+          setSelectedDifficulty(parsed.defaultDifficulty);
+        }
+        if (parsed.questionsPerQuiz) {
+          setQuestionsPerQuiz(parsed.questionsPerQuiz);
+        }
+
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+
+
+
+
+
+
+
+
+
+
 
    /**
    * Monitor network connectivity status
@@ -198,7 +260,7 @@ function HomeScreen({ navigation }) {
                 <View style={styles.categoryTextContainer}>
                   <Text style={styles.categoryTitle}>{category.name}</Text>
                   <Text style={styles.categoryMeta}>
-                    {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} • 10 questions
+                   {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} • {questionsPerQuiz} questions
                   </Text>
                 </View>
                 <Text style={styles.categoryArrow}>›</Text>
@@ -595,6 +657,25 @@ function QuizScreen({ navigation, route }) {
   */
   const fetchQuestions = async () => {
 
+
+
+
+    let questionCount = 10;
+    try {
+      const settings = await AsyncStorage.getItem('appSettings');
+      if (settings) {
+        const parsed = JSON.parse(settings);
+        questionCount = parsed.questionsPerQuiz || 10;
+        console.log('Fetching', questionCount, 'questions');
+      }
+    } catch (error) {
+      console.error('Error loading question count:', error);
+    }
+
+
+
+
+
     // Prevent the second call within 5 seconds
     const now = Date.now();
     const timeSinceLastFetch = now - globalLastFetchTime;
@@ -609,7 +690,7 @@ function QuizScreen({ navigation, route }) {
     setLoading(true);
     try {
       const response = await fetch(
-        `https://opentdb.com/api.php?amount=10&category=${categoryId}&difficulty=${difficulty}&type=multiple`
+        `https://opentdb.com/api.php?amount=${questionCount}&category=${categoryId}&difficulty=${difficulty}&type=multiple`
       );
 
       if (!response.ok) {
@@ -1240,8 +1321,62 @@ function SettingsScreen() {
   const [questionsPerQuiz, setQuestionsPerQuiz] = useState(10);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  const difficulties = ['easy', 'medium', 'hard'];
-  const questionOptions = [5, 10, 15];
+  // 設定を読み込み
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const settings = await AsyncStorage.getItem('appSettings');
+      if (settings) {
+        const parsed = JSON.parse(settings);
+        setDefaultDifficulty(parsed.defaultDifficulty || 'medium');
+        setQuestionsPerQuiz(parsed.questionsPerQuiz || 10);
+        setSoundEnabled(parsed.soundEnabled !== false);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const saveSettings = async (key, value) => {
+    try {
+      const current = await AsyncStorage.getItem('appSettings');
+      const settings = current ? JSON.parse(current) : {};
+      settings[key] = value;
+      await AsyncStorage.setItem('appSettings', JSON.stringify(settings));
+    } catch (error) {
+      console.error('Error saving settings:', error);
+    }
+  };
+
+  const cycleDifficulty = () => {
+    const difficulties = ['easy', 'medium', 'hard'];
+    const currentIndex = difficulties.indexOf(defaultDifficulty);
+    const nextDifficulty = difficulties[(currentIndex + 1) % 3];
+    console.log('Difficulty changed to:', nextDifficulty);
+
+    setDefaultDifficulty(nextDifficulty);
+    saveSettings('defaultDifficulty', nextDifficulty);
+  };
+
+  const cycleQuestions = () => {
+    const options = [5, 10, 15];
+    const currentIndex = options.indexOf(questionsPerQuiz);
+    const nextValue = options[(currentIndex + 1) % 3];
+    console.log('Questions changed to:', nextValue);
+
+    setQuestionsPerQuiz(nextValue);
+    saveSettings('questionsPerQuiz', nextValue);
+  };
+
+  const toggleSound = () => {
+    const newValue = !soundEnabled;
+    console.log('Sound changed to:', newValue);
+    setSoundEnabled(newValue);
+    saveSettings('soundEnabled', newValue);
+  };
 
   return (
     <ScrollView style={styles.settingsBg}>
@@ -1249,55 +1384,28 @@ function SettingsScreen() {
         <Text style={styles.headerText}>Settings</Text>
       </View>
 
-      <View style={styles.settingsGroup}>
-        <View style={styles.groupHeader}>
-          <Text style={styles.groupTitle}>Quiz Settings</Text>
-        </View>
+      <View style={{ padding: 20 }}>
+        <Text style={styles.settingsGroupTitle}>Quiz Settings</Text>
 
-        <TouchableOpacity
-          style={styles.settingsRow}
-          onPress={() => {
-            const currentIndex = difficulties.indexOf(defaultDifficulty);
-            const nextIndex = (currentIndex + 1) % difficulties.length;
-            setDefaultDifficulty(difficulties[nextIndex]);
-          }}
-        >
-          <Text>Default Difficulty</Text>
-          <Text style={{ color: colors.primary, fontWeight: '600' }}>
-            {defaultDifficulty.charAt(0).toUpperCase() + defaultDifficulty.slice(1)} →
-          </Text>
+        <TouchableOpacity style={styles.settingItem} onPress={cycleDifficulty}>
+          <Text style={styles.settingLabel}>Default Difficulty</Text>
+          <Text style={styles.settingValue}>{defaultDifficulty} →</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.settingsRow}
-          onPress={() => {
-            const currentIndex = questionOptions.indexOf(questionsPerQuiz);
-            const nextIndex = (currentIndex + 1) % questionOptions.length;
-            setQuestionsPerQuiz(questionOptions[nextIndex]);
-          }}
-        >
-          <Text>Questions per Quiz</Text>
-          <Text style={{ color: colors.primary, fontWeight: '600' }}>{questionsPerQuiz} →</Text>
+        <TouchableOpacity style={styles.settingItem} onPress={cycleQuestions}>
+          <Text style={styles.settingLabel}>Questions per Quiz</Text>
+          <Text style={styles.settingValue}>{questionsPerQuiz} →</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.settingsRow}
-          onPress={() => setSoundEnabled(!soundEnabled)}
-        >
-          <Text>Sound Effects</Text>
-          <Text style={{ color: colors.primary, fontWeight: '600' }}>
-            {soundEnabled ? 'ON' : 'OFF'} →
-          </Text>
+        <TouchableOpacity style={styles.settingItem} onPress={toggleSound}>
+          <Text style={styles.settingLabel}>Sound Effects</Text>
+          <Text style={styles.settingValue}>{soundEnabled ? 'on' : 'off'} →</Text>
         </TouchableOpacity>
-      </View>
 
-      <View style={styles.settingsGroup}>
-        <View style={styles.groupHeader}>
-          <Text style={styles.groupTitle}>About</Text>
-        </View>
-        <View style={styles.settingsRow}>
-          <Text>Version</Text>
-          <Text style={styles.meta}>1.0.0</Text>
+        <Text style={[styles.settingsGroupTitle, { marginTop: 30 }]}>About</Text>
+        <View style={styles.settingItem}>
+          <Text style={styles.settingLabel}>Version</Text>
+          <Text style={styles.settingValue}>1.0.0</Text>
         </View>
       </View>
     </ScrollView>
